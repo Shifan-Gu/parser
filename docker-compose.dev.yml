@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: dota_parser_db_dev
+    environment:
+      POSTGRES_DB: dota_parser
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  parser:
+    build: .
+    container_name: dota_parser_app_dev
+    ports:
+      - "5600:5600"
+    environment:
+      DB_ENABLED: "true"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: dota_parser
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./processors:/usr/src/parser/processors
+      - ./scripts:/usr/src/parser/scripts
+    # Override the CMD to rebuild and run for development
+    command: >
+      bash -c "
+        echo 'Building application...' &&
+        mvn -q -f /usr/src/parser/pom.xml clean install -U &&
+        echo 'Starting parser...' &&
+        java -jar /usr/src/parser/target/stats-0.1.0.jar
+      "
+
+volumes:
+  postgres_data_dev:

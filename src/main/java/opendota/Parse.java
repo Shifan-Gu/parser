@@ -8,7 +8,6 @@ import skadistats.clarity.model.FieldPath;
 import skadistats.clarity.model.StringTable;
 import skadistats.clarity.processor.entities.Entities;
 import skadistats.clarity.processor.entities.OnEntityEntered;
-import skadistats.clarity.processor.entities.OnEntityLeft;
 import skadistats.clarity.processor.entities.UsesEntities;
 import skadistats.clarity.processor.gameevents.OnCombatLogEntry;
 import skadistats.clarity.processor.reader.OnMessage;
@@ -42,6 +41,8 @@ import opendota.combatlogvisitors.TrackVisitor.TrackStatus;
 import opendota.processors.warding.OnWardExpired;
 import opendota.processors.warding.OnWardKilled;
 import opendota.processors.warding.OnWardPlaced;
+import opendota.database.GameEventDAO;
+import opendota.database.DatabaseInitializer;
 
 public class Parse {
 
@@ -192,6 +193,13 @@ public class Parse {
     int pingCount = 0;
     private ArrayList<Entry> logBuffer = new ArrayList<Entry>();
     int serverTick = 0;
+    
+    // Database integration
+    private GameEventDAO gameEventDAO;
+    private Long matchId;
+    private boolean databaseEnabled;
+    private int batchSize = 1000;
+    private int currentBatchSize = 0;
 
     // Draft stage variable
     boolean[] draftOrderProcessed = new boolean[24];
@@ -213,8 +221,24 @@ public class Parse {
         os = output;
         isPlayerStartingItemsWritten = new ArrayList<>(Arrays.asList(new Boolean[numPlayers]));
         Collections.fill(isPlayerStartingItemsWritten, Boolean.FALSE);
+        
+        // Initialize database connection
+        initializeDatabase();
+        
         long tStart = System.currentTimeMillis();
         new SimpleRunner(new InputStreamSource(is)).runWith(this);
+        
+        // Flush any remaining database operations
+        if (databaseEnabled && gameEventDAO != null) {
+            try {
+                gameEventDAO.executeBatch();
+                gameEventDAO.close();
+                System.err.println("Database operations completed successfully.");
+            } catch (Exception e) {
+                System.err.println("Error finalizing database operations: " + e.getMessage());
+            }
+        }
+        
         long tMatch = System.currentTimeMillis() - tStart;
         System.err.format("total time taken: %s\n", (tMatch) / 1000.0);
     }
@@ -226,6 +250,22 @@ public class Parse {
             } else {
                 e.time -= gameStartTime;
                 this.os.write((g.toJson(e) + "\n").getBytes());
+                
+                // Save to database if enabled
+                if (databaseEnabled && gameEventDAO != null) {
+                    try {
+                        gameEventDAO.insertEvent(e);
+                        currentBatchSize++;
+                        
+                        // Execute batch when it reaches the batch size
+                        if (currentBatchSize >= batchSize) {
+                            gameEventDAO.executeBatch();
+                            currentBatchSize = 0;
+                        }
+                    } catch (Exception ex) {
+                        System.err.println("Error saving event to database: " + ex.getMessage());
+                    }
+                }
             }
         } catch (IOException ex) {
             // System.err.println(ex);
@@ -1080,5 +1120,47 @@ public class Parse {
         entry.slot = getPlayerSlotFromEntity(ctx, ownerEntity);
 
         return entry;
+    }
+    
+    private void initializeDatabase() {
+        try {
+            // Check if database is enabled via environment variable
+            String dbEnabled = System.getenv("DB_ENABLED");
+            databaseEnabled = "true".equalsIgnoreCase(dbEnabled) || "1".equals(dbEnabled);
+            
+            if (!databaseEnabled) {
+                System.err.println("Database integration disabled. Set DB_ENABLED=true to enable.");
+                return;
+            }
+            
+            // Initialize database if it doesn't exist
+            try {
+                DatabaseInitializer.createDatabaseIfNotExists();
+            } catch (Exception e) {
+                System.err.println("Warning: Could not create database: " + e.getMessage());
+            }
+            
+            // Initialize database tables
+            DatabaseInitializer.initializeDatabase();
+            
+            // Generate or use provided match ID
+            String matchIdStr = System.getenv("MATCH_ID");
+            if (matchIdStr != null) {
+                matchId = Long.parseLong(matchIdStr);
+            } else {
+                // Generate a unique match ID based on current timestamp
+                matchId = System.currentTimeMillis();
+            }
+            
+            // Initialize DAO
+            gameEventDAO = new GameEventDAO(matchId);
+            
+            System.err.println("Database integration enabled for match ID: " + matchId);
+            
+        } catch (Exception e) {
+            System.err.println("Error initializing database: " + e.getMessage());
+            databaseEnabled = false;
+            gameEventDAO = null;
+        }
     }
 }
