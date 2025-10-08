@@ -176,6 +176,11 @@ public class Parse {
     int gameStartTime = 0;
     boolean postGame = false; // true when ancient destroyed
     boolean epilogue = false;
+    
+    // Position tracking configuration
+    float POSITION_SAMPLE_RATE = 0.1f; // Sample positions every 0.1 seconds (10 times per second)
+    float nextPositionSample = 0;
+    boolean positionTrackingEnabled = true;
     private Gson g = new Gson();
     HashMap<String, Integer> name_to_slot = new HashMap<String, Integer>();
     HashMap<String, Integer> abilities_tracking = new HashMap<String, Integer>();
@@ -221,6 +226,23 @@ public class Parse {
         os = output;
         isPlayerStartingItemsWritten = new ArrayList<>(Arrays.asList(new Boolean[numPlayers]));
         Collections.fill(isPlayerStartingItemsWritten, Boolean.FALSE);
+        
+        // Configure position tracking from environment variable
+        String posTrackingEnv = System.getenv("POSITION_TRACKING_ENABLED");
+        positionTrackingEnabled = posTrackingEnv == null || "true".equalsIgnoreCase(posTrackingEnv) || "1".equals(posTrackingEnv);
+        
+        String posRateEnv = System.getenv("POSITION_SAMPLE_RATE");
+        if (posRateEnv != null) {
+            try {
+                POSITION_SAMPLE_RATE = Float.parseFloat(posRateEnv);
+            } catch (NumberFormatException e) {
+                System.err.println("Invalid POSITION_SAMPLE_RATE, using default: " + POSITION_SAMPLE_RATE);
+            }
+        }
+        
+        if (positionTrackingEnabled) {
+            System.err.println("Position tracking enabled with sample rate: " + POSITION_SAMPLE_RATE + " seconds");
+        }
         
         // Initialize database connection
         initializeDatabase();
@@ -712,6 +734,11 @@ public class Parse {
             if (nextInterval == 0) {
                 nextInterval = time;
             }
+            
+            // Initialize nextPositionSample value
+            if (nextPositionSample == 0) {
+                nextPositionSample = time;
+            }
         }
         if (pr != null) {
             // Radiant coach shows up in vecPlayerTeamData as position 5
@@ -925,6 +952,12 @@ public class Parse {
                 }
                 nextInterval += INTERVAL;
             }
+            
+            // Track positions at higher frequency
+            if (init && !postGame && positionTrackingEnabled && time >= nextPositionSample) {
+                trackHeroPositions(ctx, pr, rData, dData);
+                nextPositionSample += POSITION_SAMPLE_RATE;
+            }
 
             // When the game is over, get dota plus levels
             if (postGame && !isDotaPlusProcessed) {
@@ -1120,6 +1153,53 @@ public class Parse {
         entry.slot = getPlayerSlotFromEntity(ctx, ownerEntity);
 
         return entry;
+    }
+    
+    /**
+     * Track hero positions at a higher frequency than interval events
+     * Following the clarity-examples pattern for position tracking
+     */
+    private void trackHeroPositions(Context ctx, Entity pr, Entity rData, Entity dData) {
+        for (int i = 0; i < numPlayers; i++) {
+            try {
+                Integer hero = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_nSelectedHeroID", validIndices[i]);
+                int handle = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_hSelectedHero", validIndices[i]);
+                
+                // Skip if hero not selected yet
+                if (hero == null || hero <= 0) {
+                    continue;
+                }
+                
+                // Get the hero entity
+                Entity e = ctx.getProcessor(Entities.class).getByHandle(handle);
+                if (e == null) {
+                    continue;
+                }
+                
+                // Extract position data
+                Integer cx = getEntityProperty(e, "CBodyComponent.m_cellX", null);
+                Integer cy = getEntityProperty(e, "CBodyComponent.m_cellY", null);
+                Float vx = getEntityProperty(e, "CBodyComponent.m_vecX", null);
+                Float vy = getEntityProperty(e, "CBodyComponent.m_vecY", null);
+                
+                // Only create entry if we have valid position data
+                if (cx != null && cy != null) {
+                    Entry posEntry = new Entry(time);
+                    posEntry.type = "position";
+                    posEntry.slot = i;
+                    posEntry.unit = e.getDtClass().getDtName();
+                    posEntry.hero_id = hero;
+                    posEntry.x = getPreciseLocation(cx, vx);
+                    posEntry.y = getPreciseLocation(cy, vy);
+                    posEntry.life_state = getEntityProperty(e, "m_lifeState", null);
+                    
+                    output(posEntry);
+                }
+            } catch (Exception e) {
+                // Silently skip any errors for individual players
+                // This is expected during game setup or when players disconnect
+            }
+        }
     }
     
     private void initializeDatabase() {

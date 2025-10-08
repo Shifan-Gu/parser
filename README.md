@@ -8,6 +8,7 @@ Replay parse server generating logs from replay files
 * **S3 integration** - Download replays directly from S3 buckets (AWS S3, MinIO, etc.)
 * Database storage with PostgreSQL
 * **Flyway database migrations** - Versioned schema control
+* **High-frequency position tracking** - Track hero positions at configurable rates (default 10Hz)
 * JSON output with detailed match statistics
 
 ## Quickstart
@@ -33,6 +34,23 @@ curl "http://localhost:5600/blob?replay_url=s3://bucket-name/path/to/replay.dem"
 - `S3_ACCESS_KEY` - Access key ID
 - `S3_SECRET_KEY` - Secret access key
 - `S3_PATH_STYLE_ACCESS` - Use path-style access (true for MinIO)
+
+## Position Tracking
+
+The parser can track hero positions at high frequency (10 times per second by default) and store them in the database. This enables detailed movement analysis, heatmaps, and replay visualization. See [docs/POSITION_TRACKING.md](docs/POSITION_TRACKING.md) for detailed information.
+
+**Configuration:**
+- `POSITION_TRACKING_ENABLED` - Enable/disable position tracking (default: true)
+- `POSITION_SAMPLE_RATE` - Sample rate in seconds (default: 0.1 = 10Hz)
+- `DB_ENABLED` - Must be true for position tracking to work
+
+**Example:**
+```bash
+export DB_ENABLED=true
+export POSITION_TRACKING_ENABLED=true
+export POSITION_SAMPLE_RATE=0.1
+java -jar target/stats-0.1.0.jar
+```
 
 ## Development
 
@@ -63,6 +81,7 @@ parser/
 │   ├── S3.md                  # S3 setup guide
 │   ├── DATABASE.md            # Database guide
 │   ├── FLYWAY.md              # Migration guide
+│   ├── POSITION_TRACKING.md   # Position tracking guide
 │   ├── TESTING.md             # Testing guide
 │   └── TEST_RESULTS.md        # Test results
 ├── scripts/                   # Utility scripts
@@ -82,5 +101,6 @@ parser/
 - [docs/S3.md](docs/S3.md) - S3 setup and configuration guide
 - [docs/DATABASE.md](docs/DATABASE.md) - Database setup and usage
 - [docs/FLYWAY.md](docs/FLYWAY.md) - Database migration guide
+- [docs/POSITION_TRACKING.md](docs/POSITION_TRACKING.md) - Position tracking and movement analysis
 - [docs/TESTING.md](docs/TESTING.md) - Comprehensive testing guide
 - [scripts/README.md](scripts/README.md) - Scripts documentation

@@ -32,6 +32,7 @@ public class GameEventDAO {
     private PreparedStatement startingItemStmt;
     private PreparedStatement gamePausedStmt;
     private PreparedStatement wardStmt;
+    private PreparedStatement positionStmt;
     
     public GameEventDAO(Long matchId) throws SQLException {
         this.matchId = matchId;
@@ -164,6 +165,12 @@ public class GameEventDAO {
             "attackername, created_at) " +
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
+        
+        // Position events
+        positionStmt = connection.prepareStatement(
+            "INSERT INTO position_events (match_id, time, slot, unit, hero_id, x, y, life_state, created_at) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        );
     }
     
     public void insertEvent(Parse.Entry entry) throws SQLException {
@@ -232,6 +239,9 @@ public class GameEventDAO {
                 case "obs_left":
                 case "sen_left":
                     insertWardEvent(entry, timestamp, time);
+                    break;
+                case "position":
+                    insertPositionEvent(entry, timestamp, time);
                     break;
                 default:
                     // Handle chat event types that are numeric strings
@@ -487,6 +497,24 @@ public class GameEventDAO {
         wardStmt.addBatch();
     }
     
+    private void insertPositionEvent(Parse.Entry entry, Timestamp timestamp, int time) throws SQLException {
+        // Only insert if we have valid position data
+        if (entry.x == null || entry.y == null) {
+            return;
+        }
+        
+        positionStmt.setLong(1, matchId);
+        positionStmt.setInt(2, time);
+        positionStmt.setObject(3, entry.slot);
+        positionStmt.setString(4, entry.unit);
+        positionStmt.setObject(5, entry.hero_id);
+        positionStmt.setFloat(6, entry.x);
+        positionStmt.setFloat(7, entry.y);
+        positionStmt.setObject(8, entry.life_state);
+        positionStmt.setTimestamp(9, timestamp);
+        positionStmt.addBatch();
+    }
+    
     public void executeBatch() throws SQLException {
         // Execute all batches
         combatLogStmt.executeBatch();
@@ -508,6 +536,7 @@ public class GameEventDAO {
         startingItemStmt.executeBatch();
         gamePausedStmt.executeBatch();
         wardStmt.executeBatch();
+        positionStmt.executeBatch();
     }
     
     public void close() throws SQLException {
@@ -531,6 +560,7 @@ public class GameEventDAO {
         if (startingItemStmt != null) startingItemStmt.close();
         if (gamePausedStmt != null) gamePausedStmt.close();
         if (wardStmt != null) wardStmt.close();
+        if (positionStmt != null) positionStmt.close();
         
         if (connection != null) {
             connection.close();
