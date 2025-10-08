@@ -19,7 +19,7 @@ Replay parse server generating logs from replay files
 
 ## S3 Support
 
-The parser can download replay files directly from S3 buckets. See [README_S3.md](README_S3.md) for detailed setup and usage instructions.
+The parser can download replay files directly from S3 buckets. See [docs/S3.md](docs/S3.md) for detailed setup and usage instructions.
 
 **Quick example:**
 ```bash
@@ -41,10 +41,10 @@ curl "http://localhost:5600/blob?replay_url=s3://bucket-name/path/to/replay.dem"
 # Start all services (parser, PostgreSQL, MinIO)
 docker-compose -f docker-compose.dev.yml up
 
-# Test S3 integration
-bash scripts/test_s3.sh
-# or
-python3 scripts/test_s3_simple.py
+# Run tests
+bash scripts/test/test_parser.sh      # Basic parser test
+bash scripts/test/test_s3.sh          # S3 integration test
+bash scripts/test/test_database.sh    # Database test
 ```
 
 ### Manual Build
@@ -54,7 +54,28 @@ mvn clean install
 java -jar target/stats-0.1.0.jar
 ```
 
+## Project Structure
+
+```
+parser/
+├── docs/                 # Documentation
+│   ├── S3.md            # S3 setup guide
+│   ├── DATABASE.md      # Database guide
+│   ├── TESTING.md       # Testing guide
+│   └── TEST_RESULTS.md  # Test results
+├── scripts/             # Utility scripts
+│   ├── setup/          # Setup scripts
+│   ├── build/          # Build scripts
+│   ├── test/           # Test scripts
+│   └── query/          # Query scripts
+├── src/                 # Java source code
+├── processors/          # Node.js processors
+└── database/            # Database schema
+```
+
 ## Documentation
 
-- [README_S3.md](README_S3.md) - S3 setup and configuration guide
-- [README_DATABASE.md](README_DATABASE.md) - Database setup and usage
+- [docs/S3.md](docs/S3.md) - S3 setup and configuration guide
+- [docs/DATABASE.md](docs/DATABASE.md) - Database setup and usage
+- [docs/TESTING.md](docs/TESTING.md) - Comprehensive testing guide
+- [scripts/README.md](scripts/README.md) - Scripts documentation
