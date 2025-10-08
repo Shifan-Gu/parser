@@ -27,21 +27,28 @@ fi
 
 # Test table existence
 echo "2. Testing table existence..."
-if PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -c "SELECT COUNT(*) FROM game_events;" >/dev/null 2>&1; then
-    echo "   ✓ game_events table exists"
+tables_exist=true
+for table in combat_log_events interval_events draft_timing_events ward_events action_events; do
+    if ! PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -c "SELECT COUNT(*) FROM $table;" >/dev/null 2>&1; then
+        echo "   ✗ $table table not found"
+        tables_exist=false
+    fi
+done
+
+if [ "$tables_exist" = true ]; then
+    echo "   ✓ All event tables exist"
 else
-    echo "   ✗ game_events table not found"
     echo "   Run ./scripts/setup_database.sh to initialize the database"
     exit 1
 fi
 
 # Test indexes
 echo "3. Testing indexes..."
-index_count=$(PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -c "SELECT COUNT(*) FROM pg_indexes WHERE tablename = 'game_events';" | tr -d ' ')
+index_count=$(PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -c "SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public';" | tr -d ' ')
 if [ "$index_count" -gt 0 ]; then
     echo "   ✓ Database indexes exist ($index_count indexes found)"
 else
-    echo "   ✗ No indexes found on game_events table"
+    echo "   ✗ No indexes found"
 fi
 
 # Test views

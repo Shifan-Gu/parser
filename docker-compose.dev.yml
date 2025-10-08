@@ -33,8 +33,7 @@ services:
       postgres:
         condition: service_healthy
     volumes:
-      - ./processors:/usr/src/parser/processors
-      - ./scripts:/usr/src/parser/scripts
+      - ./src:/usr/src/parser/src
     # Override the CMD to rebuild and run for development
     command: >
       bash -c "
