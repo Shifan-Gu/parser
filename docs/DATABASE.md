@@ -9,11 +9,23 @@ The parser now supports saving all parsed game events to a PostgreSQL database, 
 ## Features
 
 - **Automatic Database Creation**: Creates database and tables if they don't exist
+- **Database Migration Control**: Uses Flyway for versioned schema migrations
 - **Batch Processing**: Efficient batch inserts for better performance
 - **Connection Pooling**: Uses HikariCP for optimal database connections
 - **Comprehensive Schema**: Stores all game events with proper indexing
 - **Docker Support**: Full Docker Compose setup with PostgreSQL
 - **Query Tools**: Scripts for common database operations
+
+## Database Migrations
+
+This project uses **Flyway** for database migration control. Migrations are applied automatically when the application starts.
+
+- **Migration Files**: Located in `src/main/resources/db/migration/`
+- **Versioning**: Each migration is versioned (e.g., V1__Initial_schema.sql)
+- **Automatic**: Migrations run on application startup
+- **Tracked**: Migration history stored in `flyway_schema_history` table
+
+For detailed information about Flyway and creating migrations, see [FLYWAY.md](FLYWAY.md).
 
 ## Database Schema
 
@@ -142,10 +154,26 @@ The parser captures and stores:
 
 ## Development
 
-### Adding New Fields
-1. Update the `game_events` table schema
-2. Modify `GameEventDAO.insertEvent()` method
-3. Update the initialization script
+### Adding New Fields / Schema Changes
+
+**IMPORTANT**: Use Flyway migrations for all schema changes!
+
+1. Create a new migration file in `src/main/resources/db/migration/`:
+   ```bash
+   # Example: Add a new column
+   touch src/main/resources/db/migration/V2__Add_player_level.sql
+   ```
+
+2. Write the migration SQL:
+   ```sql
+   ALTER TABLE game_events ADD COLUMN player_level INTEGER;
+   ```
+
+3. Modify `GameEventDAO` methods to handle the new field
+
+4. Restart the application - migration applies automatically
+
+See [FLYWAY.md](FLYWAY.md) for complete migration guide
 
 ### Custom Queries
 Use the provided query script or connect directly to PostgreSQL:

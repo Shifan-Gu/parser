@@ -7,6 +7,7 @@ Replay parse server generating logs from replay files
 * HTTP/HTTPS download support
 * **S3 integration** - Download replays directly from S3 buckets (AWS S3, MinIO, etc.)
 * Database storage with PostgreSQL
+* **Flyway database migrations** - Versioned schema control
 * JSON output with detailed match statistics
 
 ## Quickstart
@@ -58,24 +59,28 @@ java -jar target/stats-0.1.0.jar
 
 ```
 parser/
-├── docs/                 # Documentation
-│   ├── S3.md            # S3 setup guide
-│   ├── DATABASE.md      # Database guide
-│   ├── TESTING.md       # Testing guide
-│   └── TEST_RESULTS.md  # Test results
-├── scripts/             # Utility scripts
-│   ├── setup/          # Setup scripts
-│   ├── build/          # Build scripts
-│   ├── test/           # Test scripts
-│   └── query/          # Query scripts
-├── src/                 # Java source code
-├── processors/          # Node.js processors
-└── database/            # Database schema
+├── docs/                       # Documentation
+│   ├── S3.md                  # S3 setup guide
+│   ├── DATABASE.md            # Database guide
+│   ├── FLYWAY.md              # Migration guide
+│   ├── TESTING.md             # Testing guide
+│   └── TEST_RESULTS.md        # Test results
+├── scripts/                   # Utility scripts
+│   ├── setup/                # Setup scripts
+│   ├── build/                # Build scripts
+│   ├── test/                 # Test scripts
+│   └── query/                # Query scripts
+├── src/                       # Java source code
+│   └── main/resources/
+│       └── db/migration/     # Flyway migrations
+├── processors/                # Node.js processors
+└── database/                  # Database schema & examples
 ```
 
 ## Documentation
 
 - [docs/S3.md](docs/S3.md) - S3 setup and configuration guide
 - [docs/DATABASE.md](docs/DATABASE.md) - Database setup and usage
+- [docs/FLYWAY.md](docs/FLYWAY.md) - Database migration guide
 - [docs/TESTING.md](docs/TESTING.md) - Comprehensive testing guide
 - [scripts/README.md](scripts/README.md) - Scripts documentation
