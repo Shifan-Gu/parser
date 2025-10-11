@@ -10,3 +10,4 @@ dependency-reduced-pom.xml
 /.factorypath
 /stats.iml
 /test-data
+dbt-venv/

@@ -1,0 +1,64 @@
+version: 2
+
+models:
+  - name: fct_hero_match_results
+    description: |
+      Fact table containing each hero's appearance in a match along with the match outcome.
+      This table joins hero picks with match results to show whether each hero won or lost.
+    columns:
+      - name: match_id
+        description: Unique identifier for the match
+        tests:
+          - not_null
+      - name: hero_id
+        description: Numeric identifier for the hero picked
+        tests:
+          - not_null
+      - name: team
+        description: Team that picked the hero (0 = Radiant, 1 = Dire)
+        tests:
+          - not_null
+      - name: draft_order
+        description: Order in which the hero was picked during the draft phase
+      - name: pick_time
+        description: Game time when the hero was picked
+      - name: winning_team
+        description: Team that won the match (0 = Radiant, 1 = Dire)
+        tests:
+          - not_null
+      - name: determination_method
+        description: Method used to determine the winner (ancient_destruction or networth_heuristic)
+      - name: won
+        description: Boolean indicating whether this hero won the match
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true, false]
+
+  - name: hero_win_rates
+    description: |
+      Aggregated hero statistics showing win rates for each hero.
+      This is the primary analytical output showing which heroes perform best.
+    columns:
+      - name: hero_id
+        description: Numeric identifier for the hero
+        tests:
+          - unique
+          - not_null
+      - name: total_matches
+        description: Total number of matches where this hero was picked
+        tests:
+          - not_null
+      - name: wins
+        description: Number of matches won with this hero
+        tests:
+          - not_null
+      - name: losses
+        description: Number of matches lost with this hero
+        tests:
+          - not_null
+      - name: win_rate_pct
+        description: Win rate as a percentage (0-100)
+      - name: win_rate_decimal
+        description: Win rate as a decimal (0-1)
+

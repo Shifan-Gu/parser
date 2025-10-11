@@ -1,0 +1,190 @@
+version: 2
+
+models:
+  - name: stg_draft_timing_events
+    description: Staging model for draft timing events (picks only, excluding bans)
+    columns:
+      - name: id
+        description: Primary key
+        meta:
+          dimension:
+            type: string
+      - name: match_id
+        description: Unique identifier for the match
+        meta:
+          dimension:
+            type: string
+      - name: time
+        description: Time in seconds from the start of the match
+        meta:
+          dimension:
+            type: number
+      - name: draft_order
+        description: Order of the pick in the draft
+        meta:
+          dimension:
+            type: number
+      - name: pick
+        description: Boolean indicating if this is a pick
+        meta:
+          dimension:
+            type: boolean
+      - name: hero_id
+        description: Numeric identifier for the hero
+        meta:
+          dimension:
+            type: number
+      - name: draft_active_team
+        description: Team making the pick (0 or 1)
+        meta:
+          dimension:
+            type: number
+      - name: draft_extime0
+        description: Extra time remaining for team 0
+        meta:
+          dimension:
+            type: number
+      - name: draft_extime1
+        description: Extra time remaining for team 1
+        meta:
+          dimension:
+            type: number
+      - name: created_at
+        description: Timestamp when the record was created
+        meta:
+          dimension:
+            type: timestamp
+
+  - name: stg_interval_events
+    description: Staging model for interval events (periodic snapshots of player state)
+    columns:
+      - name: id
+        description: Primary key
+        meta:
+          dimension:
+            type: string
+      - name: match_id
+        description: Unique identifier for the match
+        meta:
+          dimension:
+            type: string
+      - name: time
+        description: Time in seconds from the start of the match
+        meta:
+          dimension:
+            type: number
+      - name: slot
+        description: Player slot (0-9, where 0-4 is team 0, 5-9 is team 1)
+        meta:
+          dimension:
+            type: number
+      - name: hero_id
+        description: Numeric identifier for the hero
+        meta:
+          dimension:
+            type: number
+      - name: level
+        description: Hero level
+        meta:
+          dimension:
+            type: number
+      - name: gold
+        description: Current gold
+        meta:
+          dimension:
+            type: number
+      - name: lh
+        description: Last hits
+        meta:
+          dimension:
+            type: number
+      - name: xp
+        description: Experience points
+        meta:
+          dimension:
+            type: number
+      - name: kills
+        description: Number of kills
+        meta:
+          dimension:
+            type: number
+      - name: deaths
+        description: Number of deaths
+        meta:
+          dimension:
+            type: number
+      - name: assists
+        description: Number of assists
+        meta:
+          dimension:
+            type: number
+      - name: denies
+        description: Number of denies
+        meta:
+          dimension:
+            type: number
+      - name: networth
+        description: Net worth
+        meta:
+          dimension:
+            type: number
+      - name: created_at
+        description: Timestamp when the record was created
+        meta:
+          dimension:
+            type: timestamp
+
+  - name: stg_combat_log_events
+    description: Staging model for combat log events
+    columns:
+      - name: id
+        description: Primary key
+        meta:
+          dimension:
+            type: string
+      - name: match_id
+        description: Unique identifier for the match
+        meta:
+          dimension:
+            type: string
+      - name: time
+        description: Time in seconds from the start of the match
+        meta:
+          dimension:
+            type: number
+      - name: type
+        description: Type of combat log event
+        meta:
+          dimension:
+            type: string
+      - name: attackername
+        description: Name of the attacker
+        meta:
+          dimension:
+            type: string
+      - name: targetname
+        description: Target of the event
+        meta:
+          dimension:
+            type: string
+      - name: sourcename
+        description: Source of the event
+        meta:
+          dimension:
+            type: string
+      - name: targetsourcename
+        description: Target source name
+        meta:
+          dimension:
+            type: string
+      - name: value
+        description: Value associated with the event
+        meta:
+          dimension:
+            type: number
+      - name: created_at
+        description: Timestamp when the record was created
+        meta:
+          dimension:
+            type: timestamp
+
