@@ -12,10 +12,13 @@ DB_NAME=${DB_NAME:-dota_parser}
 DB_USER=${DB_USER:-postgres}
 DB_PASSWORD=${DB_PASSWORD:-postgres}
 
+# Export password for psql commands
+export PGPASSWORD=$DB_PASSWORD
+
 echo "Setting up PostgreSQL database for Dota Parser..."
 
 # Check if PostgreSQL is running
-if ! pg_isready -h $DB_HOST -p $DB_PORT -U $DB_USER >/dev/null 2>&1; then
+if ! psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d postgres -c "SELECT 1;" >/dev/null 2>&1; then
     echo "Error: PostgreSQL is not running or not accessible at $DB_HOST:$DB_PORT"
     echo "Please start PostgreSQL or check your connection settings."
     exit 1
@@ -23,11 +26,11 @@ fi
 
 # Create database if it doesn't exist
 echo "Creating database '$DB_NAME' if it doesn't exist..."
-PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d postgres -c "CREATE DATABASE $DB_NAME;" || echo "Database might already exist"
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d postgres -c "CREATE DATABASE $DB_NAME;" || echo "Database might already exist"
 
 # Run initialization script
 echo "Initializing database schema..."
-PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f database/init.sql
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f database/init.sql
 
 echo "Database setup completed successfully!"
 echo "Connection details:"
