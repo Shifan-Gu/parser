@@ -1,0 +1,7 @@
+# This directory contains Flyway database migration files
+# 
+# Naming convention: V{version}__{description}.sql
+# Example: V2__Add_performance_table.sql
+#
+# See docs/FLYWAY.md for complete migration guide
+

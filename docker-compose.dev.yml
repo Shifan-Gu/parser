@@ -67,9 +67,9 @@ services:
     command: >
       bash -c "
         echo 'Building application...' &&
-        mvn -q -f /usr/src/parser/pom.xml clean install -U &&
+        ./gradlew --no-daemon clean bootJar &&
         echo 'Starting parser...' &&
-        java -jar /usr/src/parser/target/stats-0.1.0.jar
+        java -jar /usr/src/parser/build/libs/parser-0.1.0.jar
       "
 
 volumes:
