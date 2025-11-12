@@ -2,6 +2,8 @@ package opendota;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -30,6 +32,7 @@ public class Main {
         server.createContext("/", new MyHandler());
         server.createContext("/healthz", new HealthHandler());
         server.createContext("/blob", new BlobHandler());
+        server.createContext("/local", new LocalReplayHandler());
         server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
         server.start();
 
@@ -184,6 +187,119 @@ public class Main {
                     // S3 download error
                     System.err.println("S3 download failed");
                 }
+                t.sendResponseHeaders(status, 0);
+                t.getResponseBody().close();
+            } else {
+                t.sendResponseHeaders(200, output.size());
+                output.writeTo(t.getResponseBody());
+                t.getResponseBody().close();
+            }
+        }
+    }
+
+    static class LocalReplayHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange t) throws IOException {
+            try {
+                Map<String, String> query = splitQuery(t.getRequestURI());
+                String filePath = query.get("file_path");
+                
+                if (filePath == null || filePath.isEmpty()) {
+                    System.err.println("Error: file_path parameter is required");
+                    t.sendResponseHeaders(400, 0);
+                    t.getResponseBody().close();
+                    return;
+                }
+                
+                handleLocalReplay(t, filePath);
+            } catch(InterruptedException e) {
+                e.printStackTrace();
+                t.sendResponseHeaders(500, 0);
+                t.getResponseBody().close();
+            } catch(Exception e) {
+                e.printStackTrace();
+                t.sendResponseHeaders(500, 0);
+                t.getResponseBody().close();
+            }
+        }
+
+        private void handleLocalReplay(HttpExchange t, String filePath) throws IOException, InterruptedException {
+            System.err.println("Processing local replay: " + filePath);
+            
+            File replayFile = new File(filePath);
+            
+            // Validate file exists and is readable
+            if (!replayFile.exists()) {
+                System.err.println("Error: File not found: " + filePath);
+                t.sendResponseHeaders(404, 0);
+                t.getResponseBody().close();
+                return;
+            }
+            
+            if (!replayFile.canRead()) {
+                System.err.println("Error: File not readable: " + filePath);
+                t.sendResponseHeaders(403, 0);
+                t.getResponseBody().close();
+                return;
+            }
+            
+            try (FileInputStream fileStream = new FileInputStream(replayFile)) {
+                // Determine if we need to decompress
+                boolean isBz2 = filePath.endsWith(".bz2");
+                String decompressCmd = isBz2 ? "bunzip2" : "cat";
+                
+                // Create the processing pipeline: decompress | parse | aggregate
+                String cmd = String.format("%s | curl -X POST -T - localhost:5600 | node processors/createParsedDataBlob.mjs", decompressCmd);
+                System.err.println("Local processing command: " + cmd);
+                
+                Process proc = new ProcessBuilder(new String[] {"bash", "-c", cmd}).start();
+                
+                // Pipe file stream to the process
+                OutputStream procInput = proc.getOutputStream();
+                copy(fileStream, procInput);
+                procInput.close();
+                
+                // Collect output and errors
+                ByteArrayOutputStream output = new ByteArrayOutputStream();
+                ByteArrayOutputStream error = new ByteArrayOutputStream();
+                copy(proc.getInputStream(), output);
+                copy(proc.getErrorStream(), error);
+                System.err.println(error.toString());
+                
+                int exitCode = proc.waitFor();
+                handleProcessResult(t, exitCode, output, error);
+                
+            } catch (IOException e) {
+                System.err.println("Local file read error: " + e.getMessage());
+                e.printStackTrace();
+                t.sendResponseHeaders(500, 0);
+                t.getResponseBody().close();
+            }
+        }
+
+        private void handleProcessResult(HttpExchange t, int exitCode, ByteArrayOutputStream output, ByteArrayOutputStream error) throws IOException {
+            if (exitCode != 0) {
+                int status = 500;
+                String errorStr = error.toString();
+                
+                // Handle various error conditions
+                if (errorStr.contains("bunzip2: Data integrity error when decompressing")) {
+                    System.err.println("Corrupted replay file");
+                    status = 200;
+                }
+                if (errorStr.contains("bunzip2: Compressed file ends unexpectedly")) {
+                    System.err.println("Corrupted replay file");
+                    status = 200;
+                }
+                if (errorStr.contains("bunzip2: (stdin) is not a bzip2 file.")) {
+                    System.err.println("Tried to decompress a non-bz2 file");
+                    status = 200;
+                }
+                if (errorStr.contains("curl: (28) Operation timed out")) {
+                    System.err.println("Parse operation timed out");
+                    status = 200;
+                }
+                
                 t.sendResponseHeaders(status, 0);
                 t.getResponseBody().close();
             } else {

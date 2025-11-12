@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5433:5432"
+      - "5432:5432"
     volumes:
       - postgres_data_dev:/var/lib/postgresql/data
       # Database migrations are now managed by Flyway
@@ -44,7 +44,7 @@ services:
     environment:
       DB_ENABLED: "true"
       DB_HOST: postgres
-      DB_PORT: "5433"
+      DB_PORT: "5432"
       DB_NAME: dota_parser
       DB_USER: postgres
       DB_PASSWORD: postgres
@@ -61,6 +61,8 @@ services:
         condition: service_healthy
     volumes:
       - ./src:/usr/src/parser/src
+      - ./test-data:/usr/src/parser/test-data
+      - ./processors:/usr/src/parser/processors
     # Override the CMD to rebuild and run for development
     command: >
       bash -c "

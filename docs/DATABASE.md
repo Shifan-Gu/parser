@@ -72,7 +72,7 @@ docker-compose up -d
 ```bash
 export DB_ENABLED=true
 export DB_HOST=localhost
-export DB_PORT=5433
+export DB_PORT=5432
 export DB_NAME=dota_parser
 export DB_USER=postgres
 export DB_PASSWORD=postgres
@@ -90,7 +90,7 @@ java -jar target/stats-0.1.0.jar
 |----------|---------|-------------|
 | `DB_ENABLED` | `false` | Enable database integration |
 | `DB_HOST` | `localhost` | PostgreSQL host |
-| `DB_PORT` | `5433` | PostgreSQL port |
+| `DB_PORT` | `5432` | PostgreSQL port |
 | `DB_NAME` | `dota_parser` | Database name |
 | `DB_USER` | `postgres` | Database user |
 | `DB_PASSWORD` | `postgres` | Database password |
@@ -140,7 +140,7 @@ The parser captures and stores:
 
 ### Database Connection Issues
 - Ensure PostgreSQL is running and accessible
-- Check firewall settings for port 5433
+- Check firewall settings for port 5432
 - Verify credentials and database exists
 
 ### Performance Issues
@@ -178,7 +178,7 @@ See [FLYWAY.md](FLYWAY.md) for complete migration guide
 ### Custom Queries
 Use the provided query script or connect directly to PostgreSQL:
 ```bash
-psql -h localhost -p 5433 -U postgres -d dota_parser
+psql -h localhost -p 5432 -U postgres -d dota_parser
 ```
 
 ## Security Notes

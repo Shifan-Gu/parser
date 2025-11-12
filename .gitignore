@@ -11,3 +11,4 @@ dependency-reduced-pom.xml
 /stats.iml
 /test-data
 dbt-venv/
+parsed_output_*/

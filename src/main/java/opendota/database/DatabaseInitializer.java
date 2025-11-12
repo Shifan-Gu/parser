@@ -19,7 +19,7 @@ public class DatabaseInitializer {
             
             // Use defaults if environment variables are not set
             if (host == null) host = "localhost";
-            if (port == null) port = "5433";
+            if (port == null) port = "5432";
             if (database == null) database = "dota_parser";
             if (username == null) username = "postgres";
             if (password == null) password = "postgres";
@@ -77,7 +77,7 @@ public class DatabaseInitializer {
         String password = System.getenv("DB_PASSWORD");
         
         if (host == null) host = "localhost";
-        if (port == null) port = "5433";
+        if (port == null) port = "5432";
         if (username == null) username = "postgres";
         if (password == null) password = "postgres";
         

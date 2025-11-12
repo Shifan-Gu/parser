@@ -20,7 +20,7 @@ Set environment variables for your database:
 
 ```bash
 export DB_HOST=localhost
-export DB_PORT=5433
+export DB_PORT=5432
 export DB_USER=postgres
 export DB_PASSWORD=your_password
 export DB_NAME=dota
@@ -84,7 +84,7 @@ This will open a browser with interactive documentation of your data models.
 ### Issue: "Connection refused"
 - Check that PostgreSQL is running
 - Verify environment variables are set correctly
-- Try: `pg_isready -h localhost -p 5433`
+- Try: `pg_isready -h localhost -p 5432`
 
 ### Issue: "Relation does not exist"
 - Ensure source tables exist in the database

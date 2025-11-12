@@ -8,7 +8,7 @@ dota_analytics:
     dev:
       type: postgres
       host: "{{ env_var('DB_HOST', 'localhost') }}"
-      port: "{{ env_var('DB_PORT', '5433') | as_number }}"
+      port: "{{ env_var('DB_PORT', '5432') | as_number }}"
       user: "{{ env_var('DB_USER', 'postgres') }}"
       password: "{{ env_var('DB_PASSWORD', 'postgres') }}"
       dbname: "{{ env_var('DB_NAME', 'dota_parser') }}"

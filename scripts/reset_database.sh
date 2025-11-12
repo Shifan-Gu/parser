@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 
 # Default values
 DB_HOST=${DB_HOST:-localhost}
-DB_PORT=${DB_PORT:-5433}
+DB_PORT=${DB_PORT:-5432}
 DB_NAME=${DB_NAME:-dota_parser}
 DB_USER=${DB_USER:-postgres}
 DB_PASSWORD=${DB_PASSWORD:-postgres}
@@ -45,7 +45,7 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Environment variables:"
             echo "  DB_HOST       Database host (default: localhost)"
-            echo "  DB_PORT       Database port (default: 5433)"
+            echo "  DB_PORT       Database port (default: 5432)"
             echo "  DB_NAME       Database name (default: dota_parser)"
             echo "  DB_USER       Database user (default: postgres)"
             echo "  DB_PASSWORD   Database password (default: postgres)"

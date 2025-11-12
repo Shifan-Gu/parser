@@ -214,7 +214,7 @@ docker-compose up --build
 
 Flyway uses the same database connection settings:
 - `DB_HOST` (default: localhost)
-- `DB_PORT` (default: 5433)
+- `DB_PORT` (default: 5432)
 - `DB_NAME` (default: dota_parser)
 - `DB_USER` (default: postgres)
 - `DB_PASSWORD` (default: postgres)
