@@ -18,6 +18,16 @@ Replay parse server generating logs from replay files
 * POST a .dem replay file to the server (example: scripts/test.sh)
 * The parser returns line-delimited JSON in the HTTP response
 
+## API Documentation
+
+Interactive Swagger UI is available once the server is running:
+
+```bash
+open "http://localhost:5600/swagger"
+```
+
+The generated OpenAPI description is also exposed at `http://localhost:5600/swagger/openapi.json`.
+
 ## S3 Support
 
 The parser can download replay files directly from S3 buckets. See [docs/S3.md](docs/S3.md) for detailed setup and usage instructions.

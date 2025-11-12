@@ -13,6 +13,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Timer;
@@ -33,6 +34,8 @@ public class Main {
         server.createContext("/healthz", new HealthHandler());
         server.createContext("/blob", new BlobHandler());
         server.createContext("/local", new LocalReplayHandler());
+        server.createContext("/swagger/openapi.json", new SwaggerSpecHandler());
+        server.createContext("/swagger", new SwaggerUIHandler());
         server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
         server.start();
 
@@ -56,6 +59,78 @@ public class Main {
             	e.printStackTrace();
             }
             os.close();
+        }
+    }
+
+    static class SwaggerUIHandler implements HttpHandler {
+        private static final byte[] PAGE_CONTENT = (
+            "<!DOCTYPE html>" +
+            "<html lang=\"en\">" +
+            "<head>" +
+            "<meta charset=\"UTF-8\"/>" +
+            "<title>Parser API Docs</title>" +
+            "<link rel=\"stylesheet\" href=\"https://unpkg.com/swagger-ui-dist@5/swagger-ui.css\" />" +
+            "<style>body{margin:0;background-color:#fafafa;} #swagger-ui{box-sizing:border-box;}</style>" +
+            "</head>" +
+            "<body>" +
+            "<div id=\"swagger-ui\"></div>" +
+            "<script src=\"https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js\"></script>" +
+            "<script>" +
+            "window.onload=function(){SwaggerUIBundle({url:'" + "/swagger/openapi.json" + "',dom_id:'#swagger-ui'});};" +
+            "</script>" +
+            "</body>" +
+            "</html>"
+        ).getBytes(StandardCharsets.UTF_8);
+
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                exchange.getResponseHeaders().set("Allow", "GET");
+                exchange.sendResponseHeaders(405, -1);
+                exchange.close();
+                return;
+            }
+            exchange.getResponseHeaders().set("Content-Type", "text/html; charset=utf-8");
+            exchange.sendResponseHeaders(200, PAGE_CONTENT.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(PAGE_CONTENT);
+            }
+        }
+    }
+
+    static class SwaggerSpecHandler implements HttpHandler {
+        private static final String SPEC_RESOURCE = "/swagger/openapi.json";
+
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                exchange.getResponseHeaders().set("Allow", "GET");
+                exchange.sendResponseHeaders(405, -1);
+                exchange.close();
+                return;
+            }
+            exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
+            try (InputStream specStream = Main.class.getResourceAsStream(SPEC_RESOURCE)) {
+                if (specStream == null) {
+                    exchange.sendResponseHeaders(500, -1);
+                    return;
+                }
+                byte[] specBytes = readAllBytes(specStream);
+                exchange.sendResponseHeaders(200, specBytes.length);
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(specBytes);
+                }
+            }
+        }
+
+        private byte[] readAllBytes(InputStream inputStream) throws IOException {
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            byte[] data = new byte[BUFFER_SIZE];
+            int nRead;
+            while ((nRead = inputStream.read(data, 0, data.length)) != -1) {
+                buffer.write(data, 0, nRead);
+            }
+            return buffer.toByteArray();
         }
     }
 
