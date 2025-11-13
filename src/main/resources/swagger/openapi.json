@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "OpenDota Parser API",
+    "title": "Tidebound Dota2 Replay Parser API",
     "version": "1.0.0",
     "description": "HTTP interface for parsing Dota 2 replays and managing replay ingestion workflows."
   },
@@ -62,31 +62,56 @@
         ]
       }
     },
-    "/blob": {
-      "get": {
-        "summary": "Parse remote replay",
-        "description": "Downloads a replay from a remote location (S3 or HTTP), streams it through the parser, and returns the parsed output.",
-        "parameters": [
-          {
-            "name": "replay_url",
-            "in": "query",
-            "description": "URL to the replay blob. Supports HTTP(S) and S3 URIs.",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uri"
+    "/replay/jobs": {
+      "post": {
+        "summary": "Submit replay parsing job",
+        "description": "Creates an asynchronous job to parse a replay from either a remote URL or a local file path. Returns job metadata so clients can poll for status.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "replay_url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Remote HTTP(S) or S3 URL that points to the replay."
+                  },
+                  "file_path": {
+                    "type": "string",
+                    "description": "Absolute path to a replay file accessible to the parser."
+                  }
+                },
+                "oneOf": [
+                  {
+                    "required": [
+                      "replay_url"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "file_path"
+                    ]
+                  }
+                ]
+              }
             }
           }
-        ],
+        },
         "responses": {
-          "200": {
-            "description": "Parsing succeeded, response body contains parsed output."
+          "202": {
+            "description": "Job accepted for processing. Returns job metadata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayJob"
+                }
+              }
+            }
           },
           "400": {
-            "description": "Missing or invalid `replay_url`."
-          },
-          "500": {
-            "description": "Remote replay download or parsing failed."
+            "description": "Invalid request. Exactly one replay source must be provided."
           }
         },
         "tags": [
@@ -94,36 +119,34 @@
         ]
       }
     },
-    "/local": {
+    "/replay/jobs/{job_id}": {
       "get": {
-        "summary": "Parse local replay",
-        "description": "Reads a replay from the local filesystem, streams it through the parser, and returns the parsed output.",
+        "summary": "Get replay parsing job status",
+        "description": "Returns the current status of a replay parsing job. When the job succeeds, the parsed result is included in the response.",
         "parameters": [
           {
-            "name": "file_path",
-            "in": "query",
-            "description": "Absolute path to the replay file accessible by the parser process.",
+            "name": "job_id",
+            "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "uuid"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Parsing succeeded, response body contains parsed output."
-          },
-          "400": {
-            "description": "Missing `file_path` query parameter."
-          },
-          "403": {
-            "description": "Replay exists but the parser cannot read it."
+            "description": "Job status retrieved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayJob"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Replay file not found."
-          },
-          "500": {
-            "description": "Parser encountered an unexpected error."
+            "description": "Job not found."
           }
         },
         "tags": [
@@ -141,6 +164,68 @@
       "name": "Operations",
       "description": "Health and operational endpoints."
     }
-  ]
+  ],
+  "components": {
+    "schemas": {
+      "ReplayJob": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for the job."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "REMOTE_URL",
+              "LOCAL_FILE"
+            ],
+            "description": "Source type used for the replay."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "SUCCEEDED",
+              "FAILED"
+            ],
+            "description": "Current lifecycle state of the job."
+          },
+          "source": {
+            "type": "string",
+            "description": "Replay location provided when the job was created."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the job was created."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the job last changed status."
+          },
+          "parser_status": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true,
+            "description": "HTTP-like status returned by the parser process."
+          },
+          "error": {
+            "type": "string",
+            "nullable": true,
+            "description": "Error message provided when the job fails."
+          },
+          "result": {
+            "type": "string",
+            "nullable": true,
+            "description": "Parsed replay payload returned when the job succeeds."
+          }
+        }
+      }
+    }
+  }
 }
 

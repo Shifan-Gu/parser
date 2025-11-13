@@ -18,6 +18,8 @@ CONTAINER_NAME="dota_parser_app_dev"
 TEST_DATA_DIR="${1:-test-data}"
 PARSER_URL="http://localhost:5600"
 OUTPUT_DIR="./parsed_output_docker"
+POLL_INTERVAL_SECONDS=5
+MAX_POLL_ATTEMPTS=120
 
 echo -e "${BLUE}=== Docker Local Replay Parser ===${NC}"
 echo -e "Test data directory: ${TEST_DATA_DIR}"
@@ -39,6 +41,12 @@ if ! docker ps --filter "name=${CONTAINER_NAME}" --filter "status=running" | gre
 fi
 
 echo -e "${GREEN}✓ Container is running${NC}"
+
+# Ensure jq is installed (used for JSON encoding/decoding)
+if ! command -v jq >/dev/null 2>&1; then
+    echo -e "${RED}Error: jq is required but not installed or not in PATH${NC}"
+    exit 1
+fi
 
 # Check if parser service is healthy
 echo -e "Checking parser service..."
@@ -81,8 +89,8 @@ while IFS= read -r replay_file; do
     # Container path (mounted volume path)
     container_path="/usr/src/parser/${replay_file}"
     
-    # URL encode the file path
-    encoded_path=$(echo "$container_path" | sed 's/ /%20/g')
+    # Prepare payload for job submission
+    payload=$(jq -nc --arg file_path "$container_path" '{file_path: $file_path}')
     
     # Parse the replay
     output_file="${OUTPUT_DIR}/${filename%.dem.bz2}.json"
@@ -91,16 +99,66 @@ while IFS= read -r replay_file; do
     echo -e "  Container path: ${container_path}"
     echo -e "  Output: ${output_file}"
     
-    # Make request to local replay handler
-    if curl -s -f --max-time 300 "${PARSER_URL}/local?file_path=${encoded_path}" > "$output_file" 2>/dev/null; then
-        file_size=$(du -h "$output_file" | cut -f1)
-        echo -e "  ${GREEN}✓ Success${NC} (Output size: ${file_size})"
-        successful=$((successful + 1))
-    else
-        exit_code=$?
-        echo -e "  ${RED}✗ Failed${NC} (Exit code: ${exit_code})"
+    # Submit job to parser
+    job_response=$(curl -s -f -X POST \
+        -H "Content-Type: application/json" \
+        -d "$payload" \
+        "${PARSER_URL}/replay/jobs") || {
+        echo -e "  ${RED}✗ Failed to submit parsing job${NC}"
         failed=$((failed + 1))
-        # Remove empty or failed output file
+        echo ""
+        continue
+    }
+
+    job_id=$(echo "$job_response" | jq -r '.job_id // empty')
+
+    if [ -z "$job_id" ]; then
+        echo -e "  ${RED}✗ Unable to read job_id from response${NC}"
+        failed=$((failed + 1))
+        echo ""
+        continue
+    fi
+
+    echo -e "  Job ID: ${job_id}"
+
+    attempt=0
+    job_succeeded=false
+    while true; do
+        attempt=$((attempt + 1))
+
+        job_status_response=$(curl -s -f "${PARSER_URL}/replay/jobs/${job_id}") || {
+            echo -e "  ${RED}✗ Failed to poll job status (attempt ${attempt})${NC}"
+            break
+        }
+
+        status=$(echo "$job_status_response" | jq -r '.status // empty')
+
+        if [ "$status" = "SUCCEEDED" ]; then
+            result=$(echo "$job_status_response" | jq -r '.result // empty')
+            printf '%s' "$result" > "$output_file"
+            file_size=$(du -h "$output_file" | cut -f1)
+            echo -e "  ${GREEN}✓ Success${NC} (Output size: ${file_size})"
+            successful=$((successful + 1))
+            job_succeeded=true
+            break
+        elif [ "$status" = "FAILED" ]; then
+            error_message=$(echo "$job_status_response" | jq -r '.error // "Unknown error"')
+            echo -e "  ${RED}✗ Failed${NC} (Error: ${error_message})"
+            break
+        else
+            echo -e "  Status: ${status} (poll ${attempt})"
+        fi
+
+        if [ $attempt -ge $MAX_POLL_ATTEMPTS ]; then
+            echo -e "  ${RED}✗ Timeout waiting for job ${job_id}${NC}"
+            break
+        fi
+
+        sleep $POLL_INTERVAL_SECONDS
+    done
+
+    if [ "$job_succeeded" = false ]; then
+        failed=$((failed + 1))
         rm -f "$output_file"
     fi
     

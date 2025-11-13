@@ -1,6 +1,6 @@
-package opendota.combatlogvisitors;
+package tidebound.combatlogvisitors;
 
-import opendota.Parse.Entry;
+import tidebound.Parse.Entry;
 import skadistats.clarity.model.CombatLogEntry;
 
 public interface Visitor<T> {

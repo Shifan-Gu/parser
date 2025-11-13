@@ -1,4 +1,4 @@
-package opendota.combatlogvisitors;
+package tidebound.combatlogvisitors;
 
 import java.util.HashMap;
 import java.util.HashSet;

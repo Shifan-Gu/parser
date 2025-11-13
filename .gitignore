@@ -14,3 +14,4 @@ dependency-reduced-pom.xml
 /test-data
 dbt-venv/
 parsed_output_*/
+.DS_Store

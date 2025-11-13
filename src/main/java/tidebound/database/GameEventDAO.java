@@ -1,6 +1,6 @@
-package opendota.database;
+package tidebound.database;
 
-import opendota.Parse;
+import tidebound.Parse;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;

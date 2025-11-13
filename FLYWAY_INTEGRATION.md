@@ -162,7 +162,7 @@ docker logs dota_parser_app
 
 ### Modified Files
 1. `pom.xml` - Added Flyway dependency
-2. `src/main/java/opendota/database/DatabaseInitializer.java` - Integrated Flyway
+2. `src/main/java/tidebound/database/DatabaseInitializer.java` - Integrated Flyway
 3. `docker-compose.yml` - Removed init.sql mount
 4. `docker-compose.dev.yml` - Removed init.sql mount
 5. `docs/DATABASE.md` - Added Flyway documentation

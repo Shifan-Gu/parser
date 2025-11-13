@@ -1,4 +1,4 @@
-package opendota;
+package tidebound;
 
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;

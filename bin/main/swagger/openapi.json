@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "OpenDota Parser API",
+    "title": "Tidebound Dota2 Replay Parser API",
     "version": "1.0.0",
     "description": "HTTP interface for parsing Dota 2 replays and managing replay ingestion workflows."
   },

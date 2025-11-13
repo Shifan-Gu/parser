@@ -1,4 +1,4 @@
-package opendota.service;
+package tidebound.service;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -7,7 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import opendota.S3Service;
+import tidebound.S3Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;

@@ -1,6 +1,6 @@
-package opendota.config;
+package tidebound.config;
 
-import opendota.S3Service;
+import tidebound.S3Service;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 

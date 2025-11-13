@@ -1,4 +1,4 @@
-package opendota.controller;
+package tidebound.controller;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

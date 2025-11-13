@@ -1,4 +1,4 @@
-package opendota;
+package tidebound;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;

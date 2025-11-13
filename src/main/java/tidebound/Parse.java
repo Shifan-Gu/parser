@@ -1,4 +1,4 @@
-package opendota;
+package tidebound;
 
 import com.google.gson.Gson;
 import com.google.protobuf.GeneratedMessage;
@@ -35,14 +35,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-import opendota.combatlogvisitors.TrackVisitor;
-import opendota.combatlogvisitors.GreevilsGreedVisitor;
-import opendota.combatlogvisitors.TrackVisitor.TrackStatus;
-import opendota.processors.warding.OnWardExpired;
-import opendota.processors.warding.OnWardKilled;
-import opendota.processors.warding.OnWardPlaced;
-import opendota.database.GameEventDAO;
-import opendota.database.DatabaseInitializer;
+import tidebound.combatlogvisitors.TrackVisitor;
+import tidebound.combatlogvisitors.GreevilsGreedVisitor;
+import tidebound.combatlogvisitors.TrackVisitor.TrackStatus;
+import tidebound.processors.warding.OnWardExpired;
+import tidebound.processors.warding.OnWardKilled;
+import tidebound.processors.warding.OnWardPlaced;
+import tidebound.database.GameEventDAO;
+import tidebound.database.DatabaseInitializer;
 
 public class Parse {
 

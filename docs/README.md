@@ -146,7 +146,7 @@ parser/
 │   └── query/              # Database query scripts
 │
 ├── src/                     # Java source code
-│   └── main/java/opendota/
+│   └── main/java/tidebound/
 │       ├── Main.java       # HTTP server & routing
 │       ├── Parse.java      # Replay parser
 │       ├── S3Service.java  # S3 integration

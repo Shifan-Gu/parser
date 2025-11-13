@@ -1,4 +1,4 @@
-package opendota.processors.warding;
+package tidebound.processors.warding;
 
 import java.util.ArrayDeque;
 import java.util.Collections;

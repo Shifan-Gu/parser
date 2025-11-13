@@ -4,7 +4,7 @@ plugins {
     id 'java'
 }
 
-group = 'com.opendota'
+group = 'com.tidebound'
 version = '0.1.0'
 
 java {

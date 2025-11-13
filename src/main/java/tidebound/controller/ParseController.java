@@ -1,9 +1,9 @@
-package opendota.controller;
+package tidebound.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.io.InputStream;
-import opendota.Parse;
+import tidebound.Parse;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;

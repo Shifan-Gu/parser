@@ -1,4 +1,4 @@
-package opendota.processors.warding;
+package tidebound.processors.warding;
 
 import java.lang.annotation.Annotation;
 
