@@ -19,6 +19,7 @@ import skadistats.clarity.processor.stringtables.StringTables;
 import skadistats.clarity.processor.stringtables.UsesStringTable;
 import skadistats.clarity.source.InputStreamSource;
 import skadistats.clarity.wire.shared.common.proto.CommonNetworkBaseTypes.CNETMsg_Tick;
+import skadistats.clarity.wire.shared.demo.proto.Demo;
 import skadistats.clarity.wire.shared.demo.proto.Demo.CDemoFileInfo;
 import skadistats.clarity.wire.dota.common.proto.DOTAUserMessages.CDOTAUserMsg_ChatEvent;
 import skadistats.clarity.wire.dota.common.proto.DOTAUserMessages.CDOTAUserMsg_ChatMessage;
@@ -42,6 +43,7 @@ import tidebound.processors.warding.OnWardExpired;
 import tidebound.processors.warding.OnWardKilled;
 import tidebound.processors.warding.OnWardPlaced;
 import tidebound.database.GameEventDAO;
+import tidebound.database.GameInfoDAO;
 import tidebound.database.DatabaseInitializer;
 
 public class Parse {
@@ -196,6 +198,7 @@ public class Parse {
     
     // Database integration
     private GameEventDAO gameEventDAO;
+    private GameInfoDAO gameInfoDAO;
     private Long matchId;
     private boolean databaseEnabled;
     private int batchSize = 1000;
@@ -229,10 +232,15 @@ public class Parse {
         new SimpleRunner(new InputStreamSource(is)).runWith(this);
         
         // Flush any remaining database operations
-        if (databaseEnabled && gameEventDAO != null) {
+        if (databaseEnabled) {
             try {
-                gameEventDAO.executeBatch();
-                gameEventDAO.close();
+                if (gameEventDAO != null) {
+                    gameEventDAO.executeBatch();
+                    gameEventDAO.close();
+                }
+                if (gameInfoDAO != null) {
+                    gameInfoDAO.close();
+                }
                 System.err.println("Database operations completed successfully.");
             } catch (Exception e) {
                 System.err.println("Error finalizing database operations: " + e.getMessage());
@@ -456,6 +464,9 @@ public class Parse {
         epilogueEntry.type = "epilogue";
         epilogueEntry.key = new Gson().toJson(message);
         output(epilogueEntry);
+        
+        persistGameInfo(message);
+
         epilogue = true;
         // Some replays don't have a game start time and we never flush, so just do it now
         flushLogBuffer();
@@ -1122,6 +1133,177 @@ public class Parse {
         return entry;
     }
     
+    private void persistGameInfo(CDemoFileInfo message) {
+        if (!databaseEnabled || gameInfoDAO == null) {
+            return;
+        }
+        
+        try {
+            GameInfoPayload payload = buildGameInfoPayload(message);
+            gameInfoDAO.upsertGameInfo(
+                matchId,
+                payload.replayMatchId,
+                payload.playbackTime,
+                payload.playbackTicks,
+                payload.playbackFrames,
+                payload.gameMode,
+                payload.gameWinner,
+                payload.leagueId,
+                payload.radiantTeamId,
+                payload.direTeamId,
+                payload.radiantTeamTag,
+                payload.direTeamTag,
+                payload.endTime,
+                payload.playersJson,
+                payload.picksBansJson,
+                payload.rawFileInfoJson
+            );
+        } catch (Exception e) {
+            System.err.println("Error saving game info to database: " + e.getMessage());
+        }
+    }
+    
+    private GameInfoPayload buildGameInfoPayload(CDemoFileInfo message) {
+        GameInfoPayload payload = new GameInfoPayload();
+        Map<String, Object> rawInfo = new LinkedHashMap<>();
+        
+        if (message.hasPlaybackTime()) {
+            payload.playbackTime = message.getPlaybackTime();
+            rawInfo.put("playback_time", payload.playbackTime);
+        }
+        if (message.hasPlaybackTicks()) {
+            payload.playbackTicks = message.getPlaybackTicks();
+            rawInfo.put("playback_ticks", payload.playbackTicks);
+        }
+        if (message.hasPlaybackFrames()) {
+            payload.playbackFrames = message.getPlaybackFrames();
+            rawInfo.put("playback_frames", payload.playbackFrames);
+        }
+        
+        if (message.hasGameInfo()) {
+            Map<String, Object> gameInfoMap = new LinkedHashMap<>();
+            Demo.CGameInfo gameInfo = message.getGameInfo();
+            if (gameInfo.hasDota()) {
+                Map<String, Object> dotaMap = new LinkedHashMap<>();
+                Demo.CGameInfo.CDotaGameInfo dotaInfo = gameInfo.getDota();
+                if (dotaInfo.hasMatchId()) {
+                    payload.replayMatchId = dotaInfo.getMatchId();
+                    dotaMap.put("match_id", payload.replayMatchId);
+                }
+                if (dotaInfo.hasGameMode()) {
+                    payload.gameMode = dotaInfo.getGameMode();
+                    dotaMap.put("game_mode", payload.gameMode);
+                }
+                if (dotaInfo.hasGameWinner()) {
+                    payload.gameWinner = dotaInfo.getGameWinner();
+                    dotaMap.put("game_winner", payload.gameWinner);
+                }
+                if (dotaInfo.hasLeagueid()) {
+                    payload.leagueId = dotaInfo.getLeagueid();
+                    dotaMap.put("league_id", payload.leagueId);
+                }
+                if (dotaInfo.hasRadiantTeamId()) {
+                    payload.radiantTeamId = dotaInfo.getRadiantTeamId();
+                    dotaMap.put("radiant_team_id", payload.radiantTeamId);
+                }
+                if (dotaInfo.hasDireTeamId()) {
+                    payload.direTeamId = dotaInfo.getDireTeamId();
+                    dotaMap.put("dire_team_id", payload.direTeamId);
+                }
+                if (dotaInfo.hasRadiantTeamTag()) {
+                    payload.radiantTeamTag = dotaInfo.getRadiantTeamTag();
+                    dotaMap.put("radiant_team_tag", payload.radiantTeamTag);
+                }
+                if (dotaInfo.hasDireTeamTag()) {
+                    payload.direTeamTag = dotaInfo.getDireTeamTag();
+                    dotaMap.put("dire_team_tag", payload.direTeamTag);
+                }
+                if (dotaInfo.hasEndTime()) {
+                    payload.endTime = dotaInfo.getEndTime();
+                    dotaMap.put("end_time", payload.endTime);
+                }
+                
+                List<Map<String, Object>> playerEntries = new ArrayList<>();
+                for (Demo.CGameInfo.CDotaGameInfo.CPlayerInfo playerInfo : dotaInfo.getPlayerInfoList()) {
+                    Map<String, Object> playerData = new LinkedHashMap<>();
+                    if (playerInfo.hasSteamid()) {
+                        playerData.put("steam_id", playerInfo.getSteamid());
+                    }
+                    if (playerInfo.hasPlayerName()) {
+                        playerData.put("player_name", playerInfo.getPlayerName());
+                    }
+                    if (playerInfo.hasHeroName()) {
+                        playerData.put("hero_name", playerInfo.getHeroName());
+                    }
+                    if (playerInfo.hasGameTeam()) {
+                        playerData.put("game_team", playerInfo.getGameTeam());
+                    }
+                    if (playerInfo.hasIsFakeClient()) {
+                        playerData.put("is_fake_client", playerInfo.getIsFakeClient());
+                    }
+                    if (!playerData.isEmpty()) {
+                        playerEntries.add(playerData);
+                    }
+                }
+                if (!playerEntries.isEmpty()) {
+                    payload.playersJson = g.toJson(playerEntries);
+                    dotaMap.put("players", playerEntries);
+                }
+                
+                List<Map<String, Object>> picksBansEntries = new ArrayList<>();
+                for (Demo.CGameInfo.CDotaGameInfo.CHeroSelectEvent event : dotaInfo.getPicksBansList()) {
+                    Map<String, Object> pickBanData = new LinkedHashMap<>();
+                    if (event.hasIsPick()) {
+                        pickBanData.put("is_pick", event.getIsPick());
+                    }
+                    if (event.hasTeam()) {
+                        pickBanData.put("team", event.getTeam());
+                    }
+                    if (event.hasHeroId()) {
+                        pickBanData.put("hero_id", event.getHeroId());
+                    }
+                    if (!pickBanData.isEmpty()) {
+                        picksBansEntries.add(pickBanData);
+                    }
+                }
+                if (!picksBansEntries.isEmpty()) {
+                    payload.picksBansJson = g.toJson(picksBansEntries);
+                    dotaMap.put("picks_bans", picksBansEntries);
+                }
+                
+                if (!dotaMap.isEmpty()) {
+                    gameInfoMap.put("dota", dotaMap);
+                }
+            }
+            if (!gameInfoMap.isEmpty()) {
+                rawInfo.put("game_info", gameInfoMap);
+            }
+        }
+        
+        rawInfo.put("raw_text", message.toString());
+        payload.rawFileInfoJson = g.toJson(rawInfo);
+        
+        return payload;
+    }
+    
+    private static class GameInfoPayload {
+        Long replayMatchId;
+        Float playbackTime;
+        Integer playbackTicks;
+        Integer playbackFrames;
+        Integer gameMode;
+        Integer gameWinner;
+        Integer leagueId;
+        Integer radiantTeamId;
+        Integer direTeamId;
+        String radiantTeamTag;
+        String direTeamTag;
+        Integer endTime;
+        String playersJson;
+        String picksBansJson;
+        String rawFileInfoJson;
+    }
+    
     private void initializeDatabase() {
         try {
             // Check if database is enabled via environment variable
@@ -1154,13 +1336,27 @@ public class Parse {
             
             // Initialize DAO
             gameEventDAO = new GameEventDAO(matchId);
+            gameInfoDAO = new GameInfoDAO();
             
             System.err.println("Database integration enabled for match ID: " + matchId);
             
         } catch (Exception e) {
             System.err.println("Error initializing database: " + e.getMessage());
             databaseEnabled = false;
-            gameEventDAO = null;
+            if (gameEventDAO != null) {
+                try {
+                    gameEventDAO.close();
+                } catch (Exception ignored) {
+                }
+                gameEventDAO = null;
+            }
+            if (gameInfoDAO != null) {
+                try {
+                    gameInfoDAO.close();
+                } catch (Exception ignored) {
+                }
+                gameInfoDAO = null;
+            }
         }
     }
 }
