@@ -153,6 +153,30 @@
           "Parsing"
         ]
       }
+    },
+    "/dota-constants/sync": {
+      "get": {
+        "summary": "Refresh dota constants tables",
+        "description": "Downloads the latest JSON constants from the `odota/dotaconstants` repository and stores them into tables within the `dota_constants` schema of the `dota_parser` database.",
+        "responses": {
+          "200": {
+            "description": "Synchronization completed successfully. Returns a map describing the number of rows loaded into each table.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DotaConstantsSyncResult"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Synchronization failed because of a downstream error."
+          }
+        },
+        "tags": [
+          "Constants"
+        ]
+      }
     }
   },
   "tags": [
@@ -163,6 +187,10 @@
     {
       "name": "Operations",
       "description": "Health and operational endpoints."
+    },
+    {
+      "name": "Constants",
+      "description": "Management endpoints for Dota constant reference data."
     }
   ],
   "components": {
@@ -223,6 +251,18 @@
             "nullable": true,
             "description": "Parsed replay payload returned when the job succeeds."
           }
+        }
+      },
+      "DotaConstantsSyncResult": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Number of rows written into the table."
+        },
+        "example": {
+          "dota_constants.build_ability_ids": 128,
+          "dota_constants.json_heroes": 137
         }
       }
     }
