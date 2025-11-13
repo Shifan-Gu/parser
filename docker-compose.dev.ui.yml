@@ -1,0 +1,128 @@
+x-lightdash-environment: &lightdash-environment
+  PGHOST: postgres
+  PGPORT: 5432
+  PGUSER: postgres
+  PGPASSWORD: postgres
+  PGDATABASE: dota_parser
+  LIGHTDASH_SECRET: secret
+  LIGHTDASH_LOG_LEVEL: info
+  NODE_ENV: production
+  SITE_URL: http://localhost:8000
+  EXPOSED_SITE_URL: http://localhost:8000
+  HEADLESS_BROWSER_HOST: dota_parser_headless_browser_dev
+  HEADLESS_BROWSER_PORT: 3001
+  USE_SECURE_BROWSER: false
+  DBT_DEMO_DIR: /usr/src/parser/dbt
+  S3_ENDPOINT: http://minio:9000
+  S3_REGION: us-east-1
+  S3_BUCKET: dota-replays
+  S3_ACCESS_KEY: minioadmin
+  S3_SECRET_KEY: minioadmin
+  S3_FORCE_PATH_STYLE: true
+  S3_EXPIRATION_TIME: 600
+  LIGHTDASH_PROMETHEUS_ENABLED: false
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: dota_parser_db_dev
+    environment:
+      POSTGRES_DB: dota_parser
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+      # Database migrations are now managed by Flyway
+      # See src/main/resources/db/migration/ for migration scripts
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: dota_parser_minio_dev
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_BROWSER: "on"
+      MINIO_DEFAULT_BUCKETS: dota-replays
+    volumes:
+      - minio_data_dev:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  parser:
+    build: .
+    container_name: dota_parser_app_dev
+    ports:
+      - "5600:5600"
+    environment:
+      DB_ENABLED: "true"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: dota_parser
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      # S3/MinIO configuration
+      S3_ENDPOINT: "http://minio:9000"
+      S3_REGION: "us-east-1"
+      S3_ACCESS_KEY: "minioadmin"
+      S3_SECRET_KEY: "minioadmin"
+      S3_PATH_STYLE_ACCESS: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./src:/usr/src/parser/src
+      - ./test-data:/usr/src/parser/test-data
+      - ./processors:/usr/src/parser/processors
+    # Override the CMD to rebuild and run for development
+    command: >
+      bash -c "
+        echo 'Building application...' &&
+        ./gradlew --no-daemon clean bootJar &&
+        echo 'Starting parser...' &&
+        java -jar /usr/src/parser/build/libs/parser-0.1.0.jar
+      "
+
+  headless-browser:
+    image: ghcr.io/browserless/chromium:v2.24.3
+    container_name: dota_parser_headless_browser_dev
+    ports:
+      - "3001:3000"
+
+  lightdash:
+    image: lightdash/lightdash:latest
+    container_name: dota_parser_lightdash_dev
+    platform: linux/amd64
+    ports:
+      - "8000:8000"
+    environment:
+      <<: *lightdash-environment
+      PORT: 8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      parser:
+        condition: service_started
+      headless-browser:
+        condition: service_started
+    volumes:
+      - ./dbt:/usr/src/parser/dbt
+
+volumes:
+  postgres_data_dev:
+  minio_data_dev:
