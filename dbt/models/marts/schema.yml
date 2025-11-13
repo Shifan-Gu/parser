@@ -5,80 +5,180 @@ models:
     description: |
       Fact table containing each hero's appearance in a match along with the match outcome.
       This table joins hero picks with match results to show whether each hero won or lost.
+    meta:
+      label: "英雄比赛结果事实表"
     columns:
       - name: match_id
         description: Internal match identifier from raw events
         tests:
           - not_null
+        meta:
+          dimension:
+            type: string
+            label: "比赛ID"
       - name: display_match_id
         description: Replay match identifier used for reporting and display
+        meta:
+          dimension:
+            type: string
+            label: "显示用比赛ID"
       - name: hero_id
         description: Numeric identifier for the hero picked
         tests:
           - not_null
+        meta:
+          dimension:
+            type: number
+            label: "英雄ID"
       - name: team
         description: Team that picked the hero (0 = Radiant, 1 = Dire)
         tests:
           - not_null
+        meta:
+          dimension:
+            type: number
+            label: "所属队伍"
       - name: draft_order
         description: Order in which the hero was picked during the draft phase
+        meta:
+          dimension:
+            type: number
+            label: "选人顺位"
       - name: pick_time
         description: Game time when the hero was picked
+        meta:
+          dimension:
+            type: number
+            label: "选人时间（秒）"
       - name: winning_team
         description: Team that won the match (0 = Radiant, 1 = Dire)
         tests:
           - not_null
+        meta:
+          dimension:
+            type: number
+            label: "获胜队伍"
       - name: winning_team_name
         description: Display name for the winning team
+        meta:
+          dimension:
+            type: string
+            label: "获胜队伍名称"
       - name: radiant_team_tag
         description: Display tag or name for the Radiant team
+        meta:
+          dimension:
+            type: string
+            label: "天辉队伍标签"
       - name: dire_team_tag
         description: Display tag or name for the Dire team
+        meta:
+          dimension:
+            type: string
+            label: "夜魇队伍标签"
       - name: hero_team_name
         description: Display name for the team that selected the hero
+        meta:
+          dimension:
+            type: string
+            label: "英雄所属队伍名称"
       - name: determination_method
         description: Method used to determine the winner (ancient_destruction or networth_heuristic)
+        meta:
+          dimension:
+            type: string
+            label: "胜负判定方式"
       - name: won
         description: Boolean indicating whether this hero won the match
         tests:
           - not_null
           - accepted_values:
               values: [true, false]
+        meta:
+          dimension:
+            type: boolean
+            label: "是否获胜"
 
   - name: hero_win_rates
     description: |
       Aggregated hero statistics showing win rates for each hero.
       This is the primary analytical output showing which heroes perform best.
+    meta:
+      label: "英雄胜率汇总表"
     columns:
       - name: hero_id
         description: Numeric identifier for the hero
         tests:
           - unique
           - not_null
+        meta:
+          dimension:
+            type: number
+            label: "英雄ID"
       - name: total_matches
         description: Total number of matches where this hero was picked
         tests:
           - not_null
+        meta:
+          dimension:
+            type: number
+            label: "总比赛场次"
       - name: wins
         description: Number of matches won with this hero
         tests:
           - not_null
+        meta:
+          dimension:
+            type: number
+            label: "胜场数"
       - name: losses
         description: Number of matches lost with this hero
         tests:
           - not_null
+        meta:
+          dimension:
+            type: number
+            label: "败场数"
       - name: wins_radiant
         description: Number of wins when the hero was played on the Radiant team
+        meta:
+          dimension:
+            type: number
+            label: "天辉胜场数"
       - name: wins_dire
         description: Number of wins when the hero was played on the Dire team
+        meta:
+          dimension:
+            type: number
+            label: "夜魇胜场数"
       - name: win_rate_pct
         description: Win rate as a percentage (0-100)
+        meta:
+          dimension:
+            type: number
+            label: "胜率（百分比）"
       - name: win_rate_decimal
         description: Win rate as a decimal (0-1)
+        meta:
+          dimension:
+            type: number
+            label: "胜率（小数）"
       - name: win_rate_radiant_pct
         description: Win rate percentage for Radiant appearances
+        meta:
+          dimension:
+            type: number
+            label: "天辉胜率（百分比）"
       - name: win_rate_dire_pct
         description: Win rate percentage for Dire appearances
+        meta:
+          dimension:
+            type: number
+            label: "夜魇胜率（百分比）"
       - name: winning_team_names
         description: Comma-separated list of distinct team names this hero has recorded wins with
+        meta:
+          dimension:
+            type: string
+            label: "获胜队伍名称列表"
 

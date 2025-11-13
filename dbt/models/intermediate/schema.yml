@@ -5,46 +5,82 @@ models:
     description: |
       Intermediate table determining which team won each match.
       Uses ancient destruction events as the primary method, with networth comparison as a fallback.
+    meta:
+      label: "比赛胜者判定表"
     columns:
       - name: match_id
         description: Unique identifier for the match
         tests:
           - unique
           - not_null
+        meta:
+          dimension:
+            type: string
+            label: "比赛ID"
       - name: winning_team
         description: Team that won the match (0 = Radiant, 1 = Dire)
         tests:
           - not_null
           - accepted_values:
               values: [0, 1]
+        meta:
+          dimension:
+            type: number
+            label: "获胜队伍"
       - name: determination_method
         description: Method used to determine the winner
         tests:
           - not_null
           - accepted_values:
               values: ['ancient_destruction', 'networth_heuristic']
+        meta:
+          dimension:
+            type: string
+            label: "胜负判定方式"
 
   - name: int_hero_picks
     description: |
       Intermediate table mapping heroes to matches and teams.
       Extracts relevant information from draft timing events.
+    meta:
+      label: "英雄选人信息表"
     columns:
       - name: match_id
         description: Unique identifier for the match
         tests:
           - not_null
+        meta:
+          dimension:
+            type: string
+            label: "比赛ID"
       - name: hero_id
         description: Numeric identifier for the hero
         tests:
           - not_null
+        meta:
+          dimension:
+            type: number
+            label: "英雄ID"
       - name: team
         description: Team that picked the hero (0 = Radiant, 1 = Dire)
         tests:
           - not_null
           - accepted_values:
               values: [0, 1]
+        meta:
+          dimension:
+            type: number
+            label: "所属队伍"
       - name: draft_order
         description: Order in which the hero was picked
+        meta:
+          dimension:
+            type: number
+            label: "选人顺位"
       - name: pick_time
         description: Game time when the hero was picked
+        meta:
+          dimension:
+            type: number
+            label: "选人时间（秒）"
 

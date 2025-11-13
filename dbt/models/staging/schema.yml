@@ -3,232 +3,283 @@ version: 2
 models:
   - name: stg_draft_timing_events
     description: Staging model for draft timing events (picks only, excluding bans)
+    meta:
+      label: "选人计时事件明细表"
     columns:
       - name: id
         description: Primary key
         meta:
           dimension:
             type: string
+            label: "主键ID"
       - name: match_id
         description: Unique identifier for the match
         meta:
           dimension:
             type: string
+            label: "比赛ID"
       - name: time
         description: Time in seconds from the start of the match
         meta:
           dimension:
             type: number
+            label: "比赛时间（秒）"
       - name: draft_order
         description: Order of the pick in the draft
         meta:
           dimension:
             type: number
+            label: "选人顺位"
       - name: pick
         description: Boolean indicating if this is a pick
         meta:
           dimension:
             type: boolean
+            label: "是否为选人"
       - name: hero_id
         description: Numeric identifier for the hero
         meta:
           dimension:
             type: number
+            label: "英雄ID"
       - name: draft_active_team
         description: Team making the pick (0 or 1)
         meta:
           dimension:
             type: number
+            label: "当前选人队伍"
       - name: draft_extime0
         description: Extra time remaining for team 0
         meta:
           dimension:
             type: number
+            label: "天辉额外用时"
       - name: draft_extime1
         description: Extra time remaining for team 1
         meta:
           dimension:
             type: number
+            label: "夜魇额外用时"
       - name: created_at
         description: Timestamp when the record was created
         meta:
           dimension:
             type: timestamp
+            label: "记录创建时间"
 
   - name: stg_interval_events
     description: Staging model for interval events (periodic snapshots of player state)
+    meta:
+      label: "选手区间状态事件表"
     columns:
       - name: id
         description: Primary key
         meta:
           dimension:
             type: string
+            label: "主键ID"
       - name: match_id
         description: Unique identifier for the match
         meta:
           dimension:
             type: string
+            label: "比赛ID"
       - name: time
         description: Time in seconds from the start of the match
         meta:
           dimension:
             type: number
+            label: "比赛时间（秒）"
       - name: slot
         description: Player slot (0-9, where 0-4 is team 0, 5-9 is team 1)
         meta:
           dimension:
             type: number
+            label: "选手槽位"
       - name: hero_id
         description: Numeric identifier for the hero
         meta:
           dimension:
             type: number
+            label: "英雄ID"
       - name: level
         description: Hero level
         meta:
           dimension:
             type: number
+            label: "英雄等级"
       - name: gold
         description: Current gold
         meta:
           dimension:
             type: number
+            label: "当前金币"
       - name: lh
         description: Last hits
         meta:
           dimension:
             type: number
+            label: "补刀数"
       - name: xp
         description: Experience points
         meta:
           dimension:
             type: number
+            label: "经验值"
       - name: kills
         description: Number of kills
         meta:
           dimension:
             type: number
+            label: "击杀数"
       - name: deaths
         description: Number of deaths
         meta:
           dimension:
             type: number
+            label: "死亡数"
       - name: assists
         description: Number of assists
         meta:
           dimension:
             type: number
+            label: "助攻数"
       - name: denies
         description: Number of denies
         meta:
           dimension:
             type: number
+            label: "反补数"
       - name: networth
         description: Net worth
         meta:
           dimension:
             type: number
+            label: "经济值"
       - name: created_at
         description: Timestamp when the record was created
         meta:
           dimension:
             type: timestamp
+            label: "记录创建时间"
 
   - name: stg_combat_log_events
     description: Staging model for combat log events
+    meta:
+      label: "战斗日志事件明细表"
     columns:
       - name: id
         description: Primary key
         meta:
           dimension:
             type: string
+            label: "主键ID"
       - name: match_id
         description: Unique identifier for the match
         meta:
           dimension:
             type: string
+            label: "比赛ID"
       - name: time
         description: Time in seconds from the start of the match
         meta:
           dimension:
             type: number
+            label: "比赛时间（秒）"
       - name: type
         description: Type of combat log event
         meta:
           dimension:
             type: string
+            label: "事件类型"
       - name: attackername
         description: Name of the attacker
         meta:
           dimension:
             type: string
+            label: "攻击者"
       - name: targetname
         description: Target of the event
         meta:
           dimension:
             type: string
+            label: "目标"
       - name: sourcename
         description: Source of the event
         meta:
           dimension:
             type: string
+            label: "来源"
       - name: targetsourcename
         description: Target source name
         meta:
           dimension:
             type: string
+            label: "目标来源"
       - name: value
         description: Value associated with the event
         meta:
           dimension:
             type: number
+            label: "数值"
       - name: created_at
         description: Timestamp when the record was created
         meta:
           dimension:
             type: timestamp
+            label: "记录创建时间"
 
   - name: stg_game_info
     description: Staging model for match-level metadata sourced from the game_info table
+    meta:
+      label: "比赛基础信息表"
     columns:
       - name: match_id
         description: Unique identifier linking to game events
         meta:
           dimension:
             type: string
+            label: "比赛ID"
       - name: replay_match_id
         description: Replay identifier suitable for external display
         meta:
           dimension:
             type: string
+            label: "显示用比赛ID"
       - name: game_winner
         description: Winning team as recorded by the replay metadata (0 = Radiant, 1 = Dire)
         meta:
           dimension:
             type: number
+            label: "获胜队伍"
       - name: radiant_team_id
         description: Identifier for the Radiant team
         meta:
           dimension:
             type: number
+            label: "天辉队伍ID"
       - name: dire_team_id
         description: Identifier for the Dire team
         meta:
           dimension:
             type: number
+            label: "夜魇队伍ID"
       - name: radiant_team_tag
         description: Short name or tag for the Radiant team
         meta:
           dimension:
             type: string
+            label: "天辉队伍标签"
       - name: dire_team_tag
         description: Short name or tag for the Dire team
         meta:
           dimension:
             type: string
+            label: "夜魇队伍标签"
       - name: created_at
         description: Timestamp when the metadata record was created
         meta:
           dimension:
             type: timestamp
+            label: "记录创建时间"
 
