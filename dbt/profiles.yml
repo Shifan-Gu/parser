@@ -12,7 +12,7 @@ dota_analytics:
       user: "{{ env_var('DB_USER', 'postgres') }}"
       password: "{{ env_var('DB_PASSWORD', 'postgres') }}"
       dbname: "{{ env_var('DB_NAME', 'dota_parser') }}"
-      schema: public
+      schema: analysis
       threads: 4
       keepalives_idle: 0
       sslmode: disable
