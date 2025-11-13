@@ -1,14 +1,14 @@
 package tidebound.controller;
 
-import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.io.InputStream;
-import tidebound.Parse;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
+import tidebound.Parse;
 
 @RestController
 public class ParseController {
@@ -32,4 +32,3 @@ public class ParseController {
                 .body(responseBody);
     }
 }
-

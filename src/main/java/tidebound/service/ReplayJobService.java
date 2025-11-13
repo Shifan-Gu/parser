@@ -1,6 +1,8 @@
 package tidebound.service;
 
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -45,6 +47,15 @@ public class ReplayJobService {
 
     public Optional<ReplayJobSnapshot> findJob(UUID jobId) {
         return Optional.ofNullable(jobs.get(jobId)).map(ReplayJob::snapshot);
+    }
+
+    public List<ReplayJobSnapshot> listJobs() {
+        return jobs
+                .values()
+                .stream()
+                .map(ReplayJob::snapshot)
+                .sorted(Comparator.comparing(ReplayJobSnapshot::createdAt).reversed())
+                .toList();
     }
 
     private ReplayJobSnapshot submitJob(JobType type, String source, Supplier<ReplayResponse> taskSupplier) {
