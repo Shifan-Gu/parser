@@ -1074,18 +1074,18 @@ public class Parse {
         }
     }
 
-    @OnWardKilled
-    public void onWardKilled(Context ctx, Entity e, String killerHeroName) {
-        Entry wardEntry = buildWardEntry(ctx, e);
-        wardEntry.attackername = killerHeroName;
-        output(wardEntry);
-    }
+    // @OnWardKilled
+    // public void onWardKilled(Context ctx, Entity e, String killerHeroName) {
+    //     Entry wardEntry = buildWardEntry(ctx, e);
+    //     wardEntry.attackername = killerHeroName;
+    //     output(wardEntry);
+    // }
 
-    @OnWardExpired
-    @OnWardPlaced
-    public void onWardExistenceChanged(Context ctx, Entity e) {
-        output(buildWardEntry(ctx, e));
-    }
+    // @OnWardExpired
+    // @OnWardPlaced
+    // public void onWardExistenceChanged(Context ctx, Entity e) {
+    //     output(buildWardEntry(ctx, e));
+    // }
 
     private Entry buildWardEntry(Context ctx, Entity e) {
         Entry entry = new Entry(time);
