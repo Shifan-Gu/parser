@@ -188,3 +188,47 @@ models:
           dimension:
             type: timestamp
 
+  - name: stg_game_info
+    description: Staging model for match-level metadata sourced from the game_info table
+    columns:
+      - name: match_id
+        description: Unique identifier linking to game events
+        meta:
+          dimension:
+            type: string
+      - name: replay_match_id
+        description: Replay identifier suitable for external display
+        meta:
+          dimension:
+            type: string
+      - name: game_winner
+        description: Winning team as recorded by the replay metadata (0 = Radiant, 1 = Dire)
+        meta:
+          dimension:
+            type: number
+      - name: radiant_team_id
+        description: Identifier for the Radiant team
+        meta:
+          dimension:
+            type: number
+      - name: dire_team_id
+        description: Identifier for the Dire team
+        meta:
+          dimension:
+            type: number
+      - name: radiant_team_tag
+        description: Short name or tag for the Radiant team
+        meta:
+          dimension:
+            type: string
+      - name: dire_team_tag
+        description: Short name or tag for the Dire team
+        meta:
+          dimension:
+            type: string
+      - name: created_at
+        description: Timestamp when the metadata record was created
+        meta:
+          dimension:
+            type: timestamp
+

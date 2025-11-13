@@ -78,12 +78,73 @@ combined_winners as (
         end as determination_method
     from ancient_destruction ad
     full outer join networth_winner nw on ad.match_id = nw.match_id
+),
+
+game_info as (
+    select
+        match_id,
+        replay_match_id,
+        case
+            when game_winner in (0, 1) then game_winner
+            when game_winner in (2, 3) then game_winner - 2
+            else null
+        end as game_winner_normalized,
+        radiant_team_id,
+        dire_team_id,
+        nullif(trim(radiant_team_tag), '') as radiant_team_tag,
+        nullif(trim(dire_team_tag), '') as dire_team_tag
+    from {{ ref('stg_game_info') }}
+),
+
+match_winner_candidates as (
+    select 
+        coalesce(gi.match_id, cw.match_id) as match_id,
+        coalesce(gi.replay_match_id, cw.match_id) as replay_match_id,
+        coalesce(gi.game_winner_normalized, cw.winning_team) as winning_team,
+        case
+            when gi.game_winner_normalized is not null then 'game_info'
+            else cw.determination_method
+        end as determination_method,
+        gi.radiant_team_id,
+        gi.dire_team_id,
+        gi.radiant_team_tag,
+        gi.dire_team_tag,
+        coalesce(
+            nullif(
+                case coalesce(gi.game_winner_normalized, cw.winning_team)
+                    when 0 then gi.radiant_team_tag
+                    when 1 then gi.dire_team_tag
+                end,
+                ''
+            ),
+            case coalesce(gi.game_winner_normalized, cw.winning_team)
+                when 0 then 'Radiant'
+                when 1 then 'Dire'
+                else 'Unknown'
+            end
+        ) as winning_team_name,
+        row_number() over (
+            partition by coalesce(gi.match_id, cw.match_id)
+            order by
+                case when gi.game_winner_normalized is not null then 0 else 1 end,
+                case when cw.determination_method = 'ancient_destruction' then 0 else 1 end,
+                coalesce(gi.match_id, cw.match_id)
+        ) as rn
+    from combined_winners cw
+    full outer join game_info gi on gi.match_id = cw.match_id
 )
 
 select 
     match_id,
+    replay_match_id,
     winning_team,
-    determination_method
-from combined_winners
+    determination_method,
+    radiant_team_id,
+    dire_team_id,
+    radiant_team_tag,
+    dire_team_tag,
+    winning_team_name
+from match_winner_candidates
 where winning_team is not null
+  and rn = 1
 

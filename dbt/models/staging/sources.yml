@@ -69,3 +69,26 @@ sources:
           - name: value
             description: Value associated with the event
 
+      - name: game_info
+        description: High-level metadata for each parsed match
+        columns:
+          - name: match_id
+            description: Unique identifier linking to raw game events
+            tests:
+              - not_null
+              - unique
+          - name: replay_match_id
+            description: Replay identifier used for external display
+          - name: game_winner
+            description: Winning team indicator from the replay metadata
+          - name: radiant_team_id
+            description: Identifier for the Radiant team
+          - name: dire_team_id
+            description: Identifier for the Dire team
+          - name: radiant_team_tag
+            description: Short name for the Radiant team
+          - name: dire_team_tag
+            description: Short name for the Dire team
+          - name: created_at
+            description: Timestamp when the record was created
+

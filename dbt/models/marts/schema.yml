@@ -7,9 +7,11 @@ models:
       This table joins hero picks with match results to show whether each hero won or lost.
     columns:
       - name: match_id
-        description: Unique identifier for the match
+        description: Internal match identifier from raw events
         tests:
           - not_null
+      - name: display_match_id
+        description: Replay match identifier used for reporting and display
       - name: hero_id
         description: Numeric identifier for the hero picked
         tests:
@@ -26,6 +28,14 @@ models:
         description: Team that won the match (0 = Radiant, 1 = Dire)
         tests:
           - not_null
+      - name: winning_team_name
+        description: Display name for the winning team
+      - name: radiant_team_tag
+        description: Display tag or name for the Radiant team
+      - name: dire_team_tag
+        description: Display tag or name for the Dire team
+      - name: hero_team_name
+        description: Display name for the team that selected the hero
       - name: determination_method
         description: Method used to determine the winner (ancient_destruction or networth_heuristic)
       - name: won
@@ -57,8 +67,18 @@ models:
         description: Number of matches lost with this hero
         tests:
           - not_null
+      - name: wins_radiant
+        description: Number of wins when the hero was played on the Radiant team
+      - name: wins_dire
+        description: Number of wins when the hero was played on the Dire team
       - name: win_rate_pct
         description: Win rate as a percentage (0-100)
       - name: win_rate_decimal
         description: Win rate as a decimal (0-1)
+      - name: win_rate_radiant_pct
+        description: Win rate percentage for Radiant appearances
+      - name: win_rate_dire_pct
+        description: Win rate percentage for Dire appearances
+      - name: winning_team_names
+        description: Comma-separated list of distinct team names this hero has recorded wins with
 
