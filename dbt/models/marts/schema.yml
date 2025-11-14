@@ -16,12 +16,6 @@ models:
           dimension:
             type: string
             label: "比赛ID"
-      - name: display_match_id
-        description: Replay match identifier used for reporting and display
-        meta:
-          dimension:
-            type: string
-            label: "显示用比赛ID"
       - name: hero_id
         description: Numeric identifier for the hero picked
         tests:
@@ -82,12 +76,6 @@ models:
           dimension:
             type: string
             label: "英雄所属队伍名称"
-      - name: determination_method
-        description: Method used to determine the winner (ancient_destruction or networth_heuristic)
-        meta:
-          dimension:
-            type: string
-            label: "胜负判定方式"
       - name: won
         description: Boolean indicating whether this hero won the match
         tests:

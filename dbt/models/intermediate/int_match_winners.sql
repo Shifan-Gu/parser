@@ -73,9 +73,9 @@ combined_winners as (
         coalesce(ad.match_id, nw.match_id) as match_id,
         coalesce(ad.winning_team, nw.winning_team) as winning_team,
         case 
-            when ad.winning_team is not null then 'ancient_destruction'
-            else 'networth_heuristic'
-        end as determination_method
+            when ad.winning_team is not null then 0
+            else 1
+        end as winner_priority
     from ancient_destruction ad
     full outer join networth_winner nw on ad.match_id = nw.match_id
 ),
@@ -83,7 +83,6 @@ combined_winners as (
 game_info as (
     select
         match_id,
-        replay_match_id,
         case
             when game_winner in (0, 1) then game_winner
             when game_winner in (2, 3) then game_winner - 2
@@ -99,12 +98,7 @@ game_info as (
 match_winner_candidates as (
     select 
         coalesce(gi.match_id, cw.match_id) as match_id,
-        coalesce(gi.replay_match_id, cw.match_id) as replay_match_id,
         coalesce(gi.game_winner_normalized, cw.winning_team) as winning_team,
-        case
-            when gi.game_winner_normalized is not null then 'game_info'
-            else cw.determination_method
-        end as determination_method,
         gi.radiant_team_id,
         gi.dire_team_id,
         gi.radiant_team_tag,
@@ -127,7 +121,7 @@ match_winner_candidates as (
             partition by coalesce(gi.match_id, cw.match_id)
             order by
                 case when gi.game_winner_normalized is not null then 0 else 1 end,
-                case when cw.determination_method = 'ancient_destruction' then 0 else 1 end,
+                coalesce(cw.winner_priority, 1),
                 coalesce(gi.match_id, cw.match_id)
         ) as rn
     from combined_winners cw
@@ -136,9 +130,7 @@ match_winner_candidates as (
 
 select 
     match_id,
-    replay_match_id,
     winning_team,
-    determination_method,
     radiant_team_id,
     dire_team_id,
     radiant_team_tag,

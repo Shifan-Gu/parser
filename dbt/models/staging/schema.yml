@@ -240,12 +240,6 @@ models:
           dimension:
             type: string
             label: "比赛ID"
-      - name: replay_match_id
-        description: Replay identifier suitable for external display
-        meta:
-          dimension:
-            type: string
-            label: "显示用比赛ID"
       - name: game_winner
         description: Winning team as recorded by the replay metadata (0 = Radiant, 1 = Dire)
         meta:
@@ -256,13 +250,13 @@ models:
         description: Identifier for the Radiant team
         meta:
           dimension:
-            type: number
+            type: string
             label: "天辉队伍ID"
       - name: dire_team_id
         description: Identifier for the Dire team
         meta:
           dimension:
-            type: number
+            type: string
             label: "夜魇队伍ID"
       - name: radiant_team_tag
         description: Short name or tag for the Radiant team

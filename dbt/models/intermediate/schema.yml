@@ -27,16 +27,6 @@ models:
           dimension:
             type: number
             label: "获胜队伍"
-      - name: determination_method
-        description: Method used to determine the winner
-        tests:
-          - not_null
-          - accepted_values:
-              values: ['ancient_destruction', 'networth_heuristic']
-        meta:
-          dimension:
-            type: string
-            label: "胜负判定方式"
 
   - name: int_hero_picks
     description: |

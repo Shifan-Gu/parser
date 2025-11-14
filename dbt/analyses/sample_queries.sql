@@ -92,7 +92,6 @@ SELECT
     fmr.team,
     fmr.winning_team,
     fmr.won,
-    fmr.determination_method,
     fmr.draft_order,
     fmr.pick_time
 FROM {{ ref('fct_hero_match_results') }} fmr
@@ -155,13 +154,13 @@ LIMIT 20;
 -- DATA QUALITY CHECKS
 -- =============================================================================
 
--- 11. Check match winner determination methods
+-- 11. Check match winner distributions
 SELECT 
-    determination_method,
+    winning_team,
     COUNT(*) as match_count,
     ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) as percentage
 FROM {{ ref('int_match_winners') }}
-GROUP BY determination_method;
+GROUP BY winning_team;
 
 -- 12. Verify no heroes have impossible win rates
 SELECT 

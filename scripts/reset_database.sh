@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Database Reset Script for Dota Parser
-# This script completely resets the database by dropping and recreating it
-# WARNING: This will delete ALL data in the database!
+# This script drops and recreates the replay_raw schema structure.
+# WARNING: This will delete ALL data in the replay_raw schema!
 
 set -e
 
@@ -23,6 +23,7 @@ FORCE=${FORCE:-false}
 
 # Export password for psql commands
 export PGPASSWORD=$DB_PASSWORD
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -63,10 +64,10 @@ echo -e "${YELLOW}╔═══════════════════�
 echo -e "${YELLOW}║     Database Reset Script for Dota Parser     ║${NC}"
 echo -e "${YELLOW}╚════════════════════════════════════════════════╝${NC}"
 echo ""
-echo "This will completely reset the database:"
-echo -e "  ${RED}• Drop all tables and data${NC}"
-echo -e "  ${RED}• Drop and recreate the database${NC}"
-echo -e "  • Reinitialize the schema"
+echo "This will reset the ${YELLOW}replay_raw${NC} schema in the database:"
+echo -e "  ${RED}• Drop and recreate the replay_raw schema${NC}"
+echo -e "  • Leave other schemas untouched"
+echo -e "  • Reinitialize the replay_raw schema structure"
 if [ "$RUN_DBT" = true ]; then
     echo -e "  • Run DBT models"
 fi
@@ -88,7 +89,7 @@ if [ "$FORCE" != true ]; then
 fi
 
 echo ""
-echo -e "${GREEN}Starting database reset...${NC}"
+echo -e "${GREEN}Starting replay_raw schema reset...${NC}"
 echo ""
 
 # Step 1: Check if PostgreSQL is running
@@ -104,32 +105,26 @@ fi
 echo -e "${GREEN}✓ PostgreSQL is running${NC}"
 echo ""
 
-# Step 2: Terminate existing connections
-echo "Step 2: Terminating existing connections to the database..."
-psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d postgres << EOF 2>/dev/null || true
-SELECT pg_terminate_backend(pg_stat_activity.pid)
-FROM pg_stat_activity
-WHERE pg_stat_activity.datname = '$DB_NAME'
-  AND pid <> pg_backend_pid();
-EOF
-echo -e "${GREEN}✓ Connections terminated${NC}"
+# Step 2: Drop Flyway history (if present)
+echo "Step 2: Dropping Flyway schema history (if it exists)..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -c "DROP TABLE IF EXISTS public.flyway_schema_history;" >/dev/null
+echo -e "${GREEN}✓ Flyway history cleared${NC}"
 echo ""
 
-# Step 3: Drop the database
-echo "Step 3: Dropping database '$DB_NAME'..."
-psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d postgres -c "DROP DATABASE IF EXISTS $DB_NAME;" >/dev/null
-echo -e "${GREEN}✓ Database dropped${NC}"
+# Step 3: Drop the replay_raw schema
+echo "Step 3: Dropping schema 'replay_raw' (if it exists)..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -c "DROP SCHEMA IF EXISTS replay_raw CASCADE;" >/dev/null
+echo -e "${GREEN}✓ Schema dropped${NC}"
 echo ""
 
-# Step 4: Create the database
-echo "Step 4: Creating database '$DB_NAME'..."
-psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d postgres -c "CREATE DATABASE $DB_NAME;" >/dev/null
-echo -e "${GREEN}✓ Database created${NC}"
+# Step 4: Create the replay_raw schema
+echo "Step 4: Creating schema 'replay_raw'..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -c "CREATE SCHEMA replay_raw;" >/dev/null
+echo -e "${GREEN}✓ Schema created${NC}"
 echo ""
 
-# Step 5: Initialize the schema
-echo "Step 5: Initializing database schema..."
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# Step 5: Initialize the schema objects
+echo "Step 5: Initializing replay_raw schema objects..."
 INIT_SQL="$SCRIPT_DIR/../database/init.sql"
 
 if [ ! -f "$INIT_SQL" ]; then
@@ -137,18 +132,29 @@ if [ ! -f "$INIT_SQL" ]; then
     exit 1
 fi
 
-psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f "$INIT_SQL" >/dev/null
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME <<EOF >/dev/null
+SET search_path TO replay_raw;
+\i '$INIT_SQL'
+EOF
 echo -e "${GREEN}✓ Schema initialized${NC}"
 echo ""
 
-# Step 6: Verify the reset
-echo "Step 6: Verifying database..."
-TABLE_COUNT=$(psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE';" | xargs)
-VIEW_COUNT=$(psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -c "SELECT COUNT(*) FROM information_schema.views WHERE table_schema = 'public';" | xargs)
-
-echo "  Tables created: $TABLE_COUNT"
-echo "  Views created: $VIEW_COUNT"
-echo -e "${GREEN}✓ Database verified${NC}"
+# Step 6: Ensure game_info resides in replay_raw schema
+echo "Step 6: Moving game_info table into replay_raw schema (if it exists)..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME <<'EOF' >/dev/null
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'game_info'
+    ) THEN
+        EXECUTE 'ALTER TABLE public.game_info SET SCHEMA replay_raw';
+    END IF;
+END $$;
+EOF
+echo -e "${GREEN}✓ game_info table aligned with replay_raw schema${NC}"
 echo ""
 
 # Step 7: Run DBT models (optional)
@@ -180,7 +186,7 @@ echo -e "${GREEN}╔════════════════════
 echo -e "${GREEN}║         Database Reset Completed! ✓            ║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
 echo ""
-echo "Your database has been completely reset and is ready to use."
+echo "The replay_raw schema has been reset and is ready to use."
 echo ""
 echo "Connection string:"
 echo "  postgresql://$DB_USER:****@$DB_HOST:$DB_PORT/$DB_NAME"

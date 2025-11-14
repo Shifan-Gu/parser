@@ -20,6 +20,8 @@ import java.util.TimerTask;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
+
+import tidebound.database.DatabaseInitializer;
     
 public class Main {
     
@@ -27,6 +29,7 @@ public class Main {
     private static final S3Service s3Service = new S3Service();
 
     public static void main(String[] args) throws Exception {
+        initializeDatabaseOnStartup();
         HttpServer server = HttpServer.create(new InetSocketAddress(Integer.valueOf("5600")), 0);
         server.createContext("/", new MyHandler());
         server.createContext("/healthz", new HealthHandler());
@@ -41,6 +44,28 @@ public class Main {
         Timer timer = new Timer(); 
         TimerTask task = new RegisterTask(); 
         timer.schedule(task, 0, 5000);
+    }
+
+    private static void initializeDatabaseOnStartup() throws Exception {
+        String dbEnabled = System.getenv("DB_ENABLED");
+        boolean databaseEnabled = "true".equalsIgnoreCase(dbEnabled) || "1".equals(dbEnabled);
+
+        if (!databaseEnabled) {
+            System.err.println("Database integration disabled. Set DB_ENABLED=true to enable.");
+            return;
+        }
+
+        try {
+            DatabaseInitializer.createDatabaseIfNotExists();
+        } catch (Exception e) {
+            System.err.println("Warning: Could not create database: " + e.getMessage());
+        }
+
+        try {
+            DatabaseInitializer.initializeDatabase();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to run database migrations", e);
+        }
     }
     
     static class MyHandler implements HttpHandler {

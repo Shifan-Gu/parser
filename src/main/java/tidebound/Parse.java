@@ -35,6 +35,7 @@ import java.util.*;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.sql.SQLException;
 
 import tidebound.combatlogvisitors.TrackVisitor;
 import tidebound.combatlogvisitors.GreevilsGreedVisitor;
@@ -194,6 +195,7 @@ public class Parse {
     private ArrayList<Boolean> isPlayerStartingItemsWritten;
     int pingCount = 0;
     private ArrayList<Entry> logBuffer = new ArrayList<Entry>();
+    private final List<Entry> pendingDatabaseEvents = new ArrayList<>();
     int serverTick = 0;
     
     // Database integration
@@ -234,6 +236,16 @@ public class Parse {
         // Flush any remaining database operations
         if (databaseEnabled) {
             try {
+                if (!pendingDatabaseEvents.isEmpty()) {
+                    flushPendingDatabaseEvents();
+                }
+                if (!pendingDatabaseEvents.isEmpty()) {
+                    System.err.println(String.format(
+                        "Unable to persist %d buffered events because no match ID was determined.",
+                        pendingDatabaseEvents.size()
+                    ));
+                    pendingDatabaseEvents.clear();
+                }
                 if (gameEventDAO != null) {
                     gameEventDAO.executeBatch();
                     gameEventDAO.close();
@@ -260,18 +272,12 @@ public class Parse {
                 this.os.write((g.toJson(e) + "\n").getBytes());
                 
                 // Save to database if enabled
-                if (databaseEnabled && gameEventDAO != null) {
+                if (databaseEnabled) {
                     try {
-                        gameEventDAO.insertEvent(e);
-                        currentBatchSize++;
-                        
-                        // Execute batch when it reaches the batch size
-                        if (currentBatchSize >= batchSize) {
-                            gameEventDAO.executeBatch();
-                            currentBatchSize = 0;
-                        }
+                        enqueueDatabaseEvent(e);
                     } catch (Exception ex) {
                         System.err.println("Error saving event to database: " + ex.getMessage());
+                        pendingDatabaseEvents.add(e);
                     }
                 }
             }
@@ -1133,6 +1139,81 @@ public class Parse {
         return entry;
     }
     
+    private void ensureGameEventDaoInitialized() throws SQLException {
+        if (gameEventDAO == null && matchId != null) {
+            gameEventDAO = new GameEventDAO(matchId);
+        }
+    }
+    
+    private void insertDatabaseEvent(Entry entry) throws SQLException {
+        ensureGameEventDaoInitialized();
+        if (gameEventDAO == null) {
+            pendingDatabaseEvents.add(entry);
+            return;
+        }
+        gameEventDAO.insertEvent(entry);
+        currentBatchSize++;
+        if (currentBatchSize >= batchSize) {
+            gameEventDAO.executeBatch();
+            currentBatchSize = 0;
+        }
+    }
+    
+    private void flushPendingDatabaseEvents() throws SQLException {
+        if (pendingDatabaseEvents.isEmpty()) {
+            return;
+        }
+        ensureGameEventDaoInitialized();
+        if (gameEventDAO == null) {
+            return;
+        }
+        for (Entry pendingEvent : pendingDatabaseEvents) {
+            gameEventDAO.insertEvent(pendingEvent);
+            currentBatchSize++;
+            if (currentBatchSize >= batchSize) {
+                gameEventDAO.executeBatch();
+                currentBatchSize = 0;
+            }
+        }
+        pendingDatabaseEvents.clear();
+    }
+    
+    private void enqueueDatabaseEvent(Entry entry) throws SQLException {
+        if (matchId == null) {
+            pendingDatabaseEvents.add(entry);
+            return;
+        }
+        if (!pendingDatabaseEvents.isEmpty()) {
+            flushPendingDatabaseEvents();
+        }
+        insertDatabaseEvent(entry);
+    }
+    
+    private void handleDiscoveredMatchId(Long discoveredMatchId) {
+        if (discoveredMatchId == null) {
+            return;
+        }
+        if (matchId != null && !matchId.equals(discoveredMatchId)) {
+            System.err.println(String.format(
+                "Replay match ID %d differs from configured match ID %d; keeping configured value.",
+                discoveredMatchId,
+                matchId
+            ));
+            return;
+        }
+        if (matchId == null) {
+            matchId = discoveredMatchId;
+            System.err.println("Replay match ID detected: " + matchId);
+            if (databaseEnabled) {
+                try {
+                    flushPendingDatabaseEvents();
+                } catch (SQLException e) {
+                    System.err.println("Error flushing pending database events: " + e.getMessage());
+                }
+            }
+        }
+    }
+    
     private void persistGameInfo(CDemoFileInfo message) {
         if (!databaseEnabled || gameInfoDAO == null) {
             return;
@@ -1140,9 +1221,13 @@ public class Parse {
         
         try {
             GameInfoPayload payload = buildGameInfoPayload(message);
+            handleDiscoveredMatchId(payload.sourceMatchId);
+            if (matchId == null) {
+                System.err.println("Replay match ID not available; skipping game info persistence.");
+                return;
+            }
             gameInfoDAO.upsertGameInfo(
                 matchId,
-                payload.replayMatchId,
                 payload.playbackTime,
                 payload.playbackTicks,
                 payload.playbackFrames,
@@ -1187,8 +1272,8 @@ public class Parse {
                 Map<String, Object> dotaMap = new LinkedHashMap<>();
                 Demo.CGameInfo.CDotaGameInfo dotaInfo = gameInfo.getDota();
                 if (dotaInfo.hasMatchId()) {
-                    payload.replayMatchId = dotaInfo.getMatchId();
-                    dotaMap.put("match_id", payload.replayMatchId);
+                    payload.sourceMatchId = dotaInfo.getMatchId();
+                    dotaMap.put("match_id", payload.sourceMatchId);
                 }
                 if (dotaInfo.hasGameMode()) {
                     payload.gameMode = dotaInfo.getGameMode();
@@ -1287,7 +1372,7 @@ public class Parse {
     }
     
     private static class GameInfoPayload {
-        Long replayMatchId;
+        Long sourceMatchId;
         Float playbackTime;
         Integer playbackTicks;
         Integer playbackFrames;
@@ -1325,20 +1410,7 @@ public class Parse {
             // Initialize database tables
             DatabaseInitializer.initializeDatabase();
             
-            // Generate or use provided match ID
-            String matchIdStr = System.getenv("MATCH_ID");
-            if (matchIdStr != null) {
-                matchId = Long.parseLong(matchIdStr);
-            } else {
-                // Generate a unique match ID based on current timestamp
-                matchId = System.currentTimeMillis();
-            }
-            
-            // Initialize DAO
-            gameEventDAO = new GameEventDAO(matchId);
             gameInfoDAO = new GameInfoDAO();
-            
-            System.err.println("Database integration enabled for match ID: " + matchId);
             
         } catch (Exception e) {
             System.err.println("Error initializing database: " + e.getMessage());

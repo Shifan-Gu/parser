@@ -4,7 +4,7 @@ sources:
   - name: dota_parser
     description: Dota 2 game data from PostgreSQL database
     database: "{{ env_var('DB_NAME', 'dota_parser') }}"
-    schema: public
+    schema: replay_raw
     tables:
       - name: draft_timing_events
         description: Draft timing events including picks and bans
@@ -77,8 +77,6 @@ sources:
             tests:
               - not_null
               - unique
-          - name: replay_match_id
-            description: Replay identifier used for external display
           - name: game_winner
             description: Winning team indicator from the replay metadata
           - name: radiant_team_id

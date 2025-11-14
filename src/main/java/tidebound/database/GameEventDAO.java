@@ -9,6 +9,8 @@ import java.util.Date;
 
 public class GameEventDAO {
     
+    private static final String RAW_SCHEMA = "replay_raw";
+    
     private Connection connection;
     private Long matchId;
     
@@ -41,129 +43,129 @@ public class GameEventDAO {
     
     private void initializePreparedStatements() throws SQLException {
         // Combat log events
-        combatLogStmt = connection.prepareStatement(
-            "INSERT INTO combat_log_events (match_id, time, type, attackername, targetname, sourcename, " +
+        String combatLogSql =
+            "INSERT INTO " + qualifiedTable("combat_log_events") + " (match_id, time, type, attackername, targetname, sourcename, " +
             "targetsourcename, attackerhero, targethero, attackerillusion, targetillusion, inflictor, " +
             "value, valuename, gold_reason, xp_reason, stun_duration, slow_duration, greevils_greed_stack, " +
             "tracked_death, tracked_sourcename, created_at) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        );
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        combatLogStmt = connection.prepareStatement(combatLogSql);
         
         // Action events
-        actionStmt = connection.prepareStatement(
-            "INSERT INTO action_events (match_id, time, slot, key, created_at) " +
-            "VALUES (?, ?, ?, ?, ?)"
-        );
+        String actionSql =
+            "INSERT INTO " + qualifiedTable("action_events") + " (match_id, time, slot, key, created_at) " +
+            "VALUES (?, ?, ?, ?, ?)";
+        actionStmt = connection.prepareStatement(actionSql);
         
         // Ping events
-        pingStmt = connection.prepareStatement(
-            "INSERT INTO ping_events (match_id, time, slot, created_at) " +
-            "VALUES (?, ?, ?, ?)"
-        );
+        String pingSql =
+            "INSERT INTO " + qualifiedTable("ping_events") + " (match_id, time, slot, created_at) " +
+            "VALUES (?, ?, ?, ?)";
+        pingStmt = connection.prepareStatement(pingSql);
         
         // Chat type events (numbered types)
-        chatTypeStmt = connection.prepareStatement(
-            "INSERT INTO chat_type_events (match_id, time, type, player1, player2, value, created_at) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?)"
-        );
+        String chatTypeSql =
+            "INSERT INTO " + qualifiedTable("chat_type_events") + " (match_id, time, type, player1, player2, value, created_at) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?)";
+        chatTypeStmt = connection.prepareStatement(chatTypeSql);
         
         // Chat events
-        chatStmt = connection.prepareStatement(
-            "INSERT INTO chat_events (match_id, time, slot, unit, key, created_at) " +
-            "VALUES (?, ?, ?, ?, ?, ?)"
-        );
+        String chatSql =
+            "INSERT INTO " + qualifiedTable("chat_events") + " (match_id, time, slot, unit, key, created_at) " +
+            "VALUES (?, ?, ?, ?, ?, ?)";
+        chatStmt = connection.prepareStatement(chatSql);
         
         // Chatwheel events
-        chatwheelStmt = connection.prepareStatement(
-            "INSERT INTO chatwheel_events (match_id, time, slot, key, created_at) " +
-            "VALUES (?, ?, ?, ?, ?)"
-        );
+        String chatwheelSql =
+            "INSERT INTO " + qualifiedTable("chatwheel_events") + " (match_id, time, slot, key, created_at) " +
+            "VALUES (?, ?, ?, ?, ?)";
+        chatwheelStmt = connection.prepareStatement(chatwheelSql);
         
         // Cosmetics events
-        cosmeticsStmt = connection.prepareStatement(
-            "INSERT INTO cosmetics_events (match_id, time, key, created_at) " +
-            "VALUES (?, ?, ?, ?)"
-        );
+        String cosmeticsSql =
+            "INSERT INTO " + qualifiedTable("cosmetics_events") + " (match_id, time, key, created_at) " +
+            "VALUES (?, ?, ?, ?)";
+        cosmeticsStmt = connection.prepareStatement(cosmeticsSql);
         
         // Dotaplus events
-        dotaplusStmt = connection.prepareStatement(
-            "INSERT INTO dotaplus_events (match_id, time, key, created_at) " +
-            "VALUES (?, ?, ?, ?)"
-        );
+        String dotaplusSql =
+            "INSERT INTO " + qualifiedTable("dotaplus_events") + " (match_id, time, key, created_at) " +
+            "VALUES (?, ?, ?, ?)";
+        dotaplusStmt = connection.prepareStatement(dotaplusSql);
         
         // Epilogue events
-        epilogueStmt = connection.prepareStatement(
-            "INSERT INTO epilogue_events (match_id, time, key, created_at) " +
-            "VALUES (?, ?, ?, ?)"
-        );
+        String epilogueSql =
+            "INSERT INTO " + qualifiedTable("epilogue_events") + " (match_id, time, key, created_at) " +
+            "VALUES (?, ?, ?, ?)";
+        epilogueStmt = connection.prepareStatement(epilogueSql);
         
         // Neutral token events
-        neutralTokenStmt = connection.prepareStatement(
-            "INSERT INTO neutral_token_events (match_id, time, slot, key, created_at) " +
-            "VALUES (?, ?, ?, ?, ?)"
-        );
+        String neutralTokenSql =
+            "INSERT INTO " + qualifiedTable("neutral_token_events") + " (match_id, time, slot, key, created_at) " +
+            "VALUES (?, ?, ?, ?, ?)";
+        neutralTokenStmt = connection.prepareStatement(neutralTokenSql);
         
         // Neutral item history events
-        neutralItemHistoryStmt = connection.prepareStatement(
-            "INSERT INTO neutral_item_history_events (match_id, time, slot, key, isNeutralActiveDrop, " +
+        String neutralItemHistorySql =
+            "INSERT INTO " + qualifiedTable("neutral_item_history_events") + " (match_id, time, slot, key, isNeutralActiveDrop, " +
             "isNeutralPassiveDrop, created_at) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?)"
-        );
+            "VALUES (?, ?, ?, ?, ?, ?, ?)";
+        neutralItemHistoryStmt = connection.prepareStatement(neutralItemHistorySql);
         
         // Player slot events
-        playerSlotStmt = connection.prepareStatement(
-            "INSERT INTO player_slot_events (match_id, time, key, value, created_at) " +
-            "VALUES (?, ?, ?, ?, ?)"
-        );
+        String playerSlotSql =
+            "INSERT INTO " + qualifiedTable("player_slot_events") + " (match_id, time, key, value, created_at) " +
+            "VALUES (?, ?, ?, ?, ?)";
+        playerSlotStmt = connection.prepareStatement(playerSlotSql);
         
         // Draft start events
-        draftStartStmt = connection.prepareStatement(
-            "INSERT INTO draft_start_events (match_id, time, created_at) " +
-            "VALUES (?, ?, ?)"
-        );
+        String draftStartSql =
+            "INSERT INTO " + qualifiedTable("draft_start_events") + " (match_id, time, created_at) " +
+            "VALUES (?, ?, ?)";
+        draftStartStmt = connection.prepareStatement(draftStartSql);
         
         // Draft timing events
-        draftTimingStmt = connection.prepareStatement(
-            "INSERT INTO draft_timing_events (match_id, time, draft_order, pick, hero_id, " +
+        String draftTimingSql =
+            "INSERT INTO " + qualifiedTable("draft_timing_events") + " (match_id, time, draft_order, pick, hero_id, " +
             "draft_active_team, draft_extime0, draft_extime1, created_at) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        );
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        draftTimingStmt = connection.prepareStatement(draftTimingSql);
         
         // Interval events
-        intervalStmt = connection.prepareStatement(
-            "INSERT INTO interval_events (match_id, time, slot, unit, hero_id, variant, facet_hero_id, " +
+        String intervalSql =
+            "INSERT INTO " + qualifiedTable("interval_events") + " (match_id, time, slot, unit, hero_id, variant, facet_hero_id, " +
             "level, x, y, life_state, gold, lh, xp, stuns, kills, deaths, assists, denies, " +
             "obs_placed, sen_placed, creeps_stacked, camps_stacked, rune_pickups, towers_killed, " +
             "roshans_killed, observers_placed, networth, repicked, randomed, pred_vict, " +
             "firstblood_claimed, teamfight_participation, stage, created_at) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        );
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        intervalStmt = connection.prepareStatement(intervalSql);
         
         // Ability level events
-        abilityLevelStmt = connection.prepareStatement(
-            "INSERT INTO ability_level_events (match_id, time, targetname, valuename, abilitylevel, created_at) " +
-            "VALUES (?, ?, ?, ?, ?, ?)"
-        );
+        String abilitySql =
+            "INSERT INTO " + qualifiedTable("ability_level_events") + " (match_id, time, targetname, valuename, abilitylevel, created_at) " +
+            "VALUES (?, ?, ?, ?, ?, ?)";
+        abilityLevelStmt = connection.prepareStatement(abilitySql);
         
         // Starting item events
-        startingItemStmt = connection.prepareStatement(
-            "INSERT INTO starting_item_events (match_id, time, slot, targetname, valuename, value, " +
+        String startingItemSql =
+            "INSERT INTO " + qualifiedTable("starting_item_events") + " (match_id, time, slot, targetname, valuename, value, " +
             "itemslot, charges, secondary_charges, created_at) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        );
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        startingItemStmt = connection.prepareStatement(startingItemSql);
         
         // Game paused events
-        gamePausedStmt = connection.prepareStatement(
-            "INSERT INTO game_paused_events (match_id, time, key, value, created_at) " +
-            "VALUES (?, ?, ?, ?, ?)"
-        );
+        String gamePausedSql =
+            "INSERT INTO " + qualifiedTable("game_paused_events") + " (match_id, time, key, value, created_at) " +
+            "VALUES (?, ?, ?, ?, ?)";
+        gamePausedStmt = connection.prepareStatement(gamePausedSql);
         
         // Ward events
-        wardStmt = connection.prepareStatement(
-            "INSERT INTO ward_events (match_id, time, type, slot, x, y, z, entityleft, ehandle, " +
+        String wardSql =
+            "INSERT INTO " + qualifiedTable("ward_events") + " (match_id, time, type, slot, x, y, z, entityleft, ehandle, " +
             "attackername, created_at) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        );
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        wardStmt = connection.prepareStatement(wardSql);
     }
     
     public void insertEvent(Parse.Entry entry) throws SQLException {
@@ -252,6 +254,10 @@ public class GameEventDAO {
         } catch (NumberFormatException e) {
             return false;
         }
+    }
+    
+    private String qualifiedTable(String tableName) {
+        return RAW_SCHEMA + "." + tableName;
     }
     
     private void insertCombatLogEvent(Parse.Entry entry, Timestamp timestamp, int time) throws SQLException {

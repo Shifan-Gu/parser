@@ -9,7 +9,6 @@
 
 select
     hp.match_id,
-    coalesce(mw.replay_match_id, hp.match_id) as display_match_id,
     hp.hero_id,
     hp.team,
     hp.draft_order,
@@ -29,7 +28,6 @@ select
         end,
         'Unknown'
     ) as hero_team_name,
-    mw.determination_method,
     case 
         when hp.team = mw.winning_team then true 
         else false 
