@@ -12,6 +12,7 @@ with picks as (
     select
         match_id,
         hero_id,
+        hero_chinese_name,
         draft_active_team,
         draft_order,
         time as pick_time
@@ -46,6 +47,7 @@ hero_slot_team as (
 select
     p.match_id,
     p.hero_id,
+    p.hero_chinese_name,
     coalesce(
         case 
             when lower((p.draft_active_team)::text) in ('0', 'radiant', 'team_0', 'false', 'f') then 0

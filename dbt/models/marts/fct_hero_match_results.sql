@@ -10,6 +10,7 @@
 select
     hp.match_id,
     hp.hero_id,
+    hp.hero_chinese_name,
     hp.team,
     hp.draft_order,
     hp.pick_time,
@@ -33,13 +34,15 @@ select
         else false 
     end as won
 from (
-    select distinct
+    select
         match_id,
         hero_id,
-        team,
-        draft_order,
-        pick_time
+        max(hero_chinese_name) as hero_chinese_name,
+        max(team) as team,
+        min(draft_order) as draft_order,
+        min(pick_time) as pick_time
     from {{ ref('int_hero_picks') }}
+    group by match_id, hero_id
 ) hp
 inner join {{ ref('int_match_winners') }} mw 
     on hp.match_id = mw.match_id

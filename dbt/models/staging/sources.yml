@@ -90,3 +90,25 @@ sources:
           - name: created_at
             description: Timestamp when the record was created
 
+  - name: dota_constants
+    description: Constants and reference data for Dota 2
+    database: "{{ env_var('DB_NAME', 'dota_parser') }}"
+    schema: dota_constants
+    tables:
+      - name: hero_chinese_names
+        description: Mapping of hero IDs to their Chinese names
+        columns:
+          - name: hero_id
+            description: Numeric identifier for the hero
+            tests:
+              - not_null
+              - unique
+          - name: chinese_name
+            description: Chinese name of the hero
+            tests:
+              - not_null
+          - name: created_at
+            description: Timestamp when the record was created
+          - name: updated_at
+            description: Timestamp when the record was last updated
+

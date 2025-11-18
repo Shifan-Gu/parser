@@ -36,6 +36,7 @@ hero_winning_teams as (
 
 select
     hs.hero_id,
+    hcn.chinese_name as hero_chinese_name,
     hs.total_matches,
     hs.wins,
     hs.losses,
@@ -48,6 +49,8 @@ select
     hwt.winning_team_names
 from hero_stats hs
 left join hero_winning_teams hwt on hs.hero_id = hwt.hero_id
+left join {{ source('dota_constants', 'hero_chinese_names') }} hcn
+    on hs.hero_id = hcn.hero_id
 where hs.total_matches > 0
 order by total_matches desc, win_rate_pct desc
 

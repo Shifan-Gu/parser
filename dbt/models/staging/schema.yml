@@ -42,6 +42,12 @@ models:
           dimension:
             type: number
             label: "英雄ID"
+      - name: hero_chinese_name
+        description: Chinese name of the hero
+        meta:
+          dimension:
+            type: string
+            label: "英雄中文名"
       - name: draft_active_team
         description: Team making the pick (0 or 1)
         meta:
@@ -102,60 +108,129 @@ models:
           dimension:
             type: number
             label: "英雄ID"
+      - name: hero_chinese_name
+        description: Chinese name of the hero
+        meta:
+          dimension:
+            type: string
+            label: "英雄中文名"
       - name: level
         description: Hero level
         meta:
           dimension:
             type: number
             label: "英雄等级"
+          metrics:
+            total_level:
+              type: sum
+              label: "英雄等级总和"
+            avg_level:
+              type: average
+              label: "平均英雄等级"
       - name: gold
         description: Current gold
         meta:
           dimension:
             type: number
             label: "当前金币"
+          metrics:
+            total_gold:
+              type: sum
+              label: "金币总和"
+            avg_gold:
+              type: average
+              label: "平均金币"
       - name: lh
         description: Last hits
         meta:
           dimension:
             type: number
             label: "补刀数"
+          metrics:
+            total_lh:
+              type: sum
+              label: "补刀数总和"
+            avg_lh:
+              type: average
+              label: "平均补刀数"
       - name: xp
         description: Experience points
         meta:
           dimension:
             type: number
             label: "经验值"
+          metrics:
+            total_xp:
+              type: sum
+              label: "经验值总和"
+            avg_xp:
+              type: average
+              label: "平均经验值"
       - name: kills
         description: Number of kills
         meta:
           dimension:
             type: number
             label: "击杀数"
+          metrics:
+            total_kills:
+              type: sum
+              label: "击杀数总和"
+            avg_kills:
+              type: average
+              label: "平均击杀数"
       - name: deaths
         description: Number of deaths
         meta:
           dimension:
             type: number
             label: "死亡数"
+          metrics:
+            total_deaths:
+              type: sum
+              label: "死亡数总和"
+            avg_deaths:
+              type: average
+              label: "平均死亡数"
       - name: assists
         description: Number of assists
         meta:
           dimension:
             type: number
             label: "助攻数"
+          metrics:
+            total_assists:
+              type: sum
+              label: "助攻数总和"
+            avg_assists:
+              type: average
+              label: "平均助攻数"
       - name: denies
         description: Number of denies
         meta:
           dimension:
             type: number
             label: "反补数"
+          metrics:
+            total_denies:
+              type: sum
+              label: "反补数总和"
+            avg_denies:
+              type: average
+              label: "平均反补数"
       - name: networth
         description: Net worth
         meta:
           dimension:
             type: number
             label: "经济值"
+          metrics:
+            total_networth:
+              type: sum
+              label: "经济值总和"
+            avg_networth:
+              type: average
+              label: "平均经济值"
       - name: created_at
         description: Timestamp when the record was created
         meta:

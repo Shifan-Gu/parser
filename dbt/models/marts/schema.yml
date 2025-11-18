@@ -24,6 +24,12 @@ models:
           dimension:
             type: number
             label: "英雄ID"
+      - name: hero_chinese_name
+        description: Chinese name of the hero
+        meta:
+          dimension:
+            type: string
+            label: "英雄中文名"
       - name: team
         description: Team that picked the hero (0 = Radiant, 1 = Dire)
         tests:
@@ -103,6 +109,12 @@ models:
           dimension:
             type: number
             label: "英雄ID"
+      - name: hero_chinese_name
+        description: Chinese name of the hero
+        meta:
+          dimension:
+            type: string
+            label: "英雄中文名"
       - name: total_matches
         description: Total number of matches where this hero was picked
         tests:

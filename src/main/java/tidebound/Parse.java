@@ -714,7 +714,7 @@ public class Parse {
                         draftTimingsEntry.draft_order = order;
                         order = order + 1;
                         draftTimingsEntry.pick = i >= 14;
-                        draftTimingsEntry.hero_id = draftHeroes[i];
+                        draftTimingsEntry.hero_id = draftHeroes[i] / 2;
                         draftTimingsEntry.draft_active_team = getEntityProperty(grp, "m_pGameRules.m_iActiveTeam",
                                 null);
                         draftTimingsEntry.draft_extime0 = Math
