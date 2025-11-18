@@ -49,11 +49,11 @@ models:
             type: string
             label: "英雄中文名"
       - name: draft_active_team
-        description: Team making the pick (0 or 1)
+        description: Team making the pick (2 = Radiant, 3 = Dire)
         meta:
           dimension:
             type: number
-            label: "当前选人队伍"
+            label: "当前选人阵营编码"
       - name: draft_extime0
         description: Extra time remaining for team 0
         meta:
@@ -316,7 +316,7 @@ models:
             type: string
             label: "比赛ID"
       - name: game_winner
-        description: Winning team as recorded by the replay metadata (0 = Radiant, 1 = Dire)
+        description: Winning team as recorded by the replay metadata (2 = Radiant, 3 = Dire, or legacy 0/1 values)
         meta:
           dimension:
             type: number

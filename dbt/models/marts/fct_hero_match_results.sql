@@ -20,12 +20,12 @@ select
     mw.dire_team_tag,
     coalesce(
         case 
-            when hp.team = 0 then coalesce(nullif(mw.radiant_team_tag, ''), 'Radiant')
-            when hp.team = 1 then coalesce(nullif(mw.dire_team_tag, ''), 'Dire')
+            when hp.team = 2 then coalesce(nullif(mw.radiant_team_tag, ''), 'Radiant')
+            when hp.team = 3 then coalesce(nullif(mw.dire_team_tag, ''), 'Dire')
         end,
         case 
-            when mw.winning_team = 0 then coalesce(nullif(mw.radiant_team_tag, ''), 'Radiant')
-            when mw.winning_team = 1 then coalesce(nullif(mw.dire_team_tag, ''), 'Dire')
+            when mw.winning_team = 2 then coalesce(nullif(mw.radiant_team_tag, ''), 'Radiant')
+            when mw.winning_team = 3 then coalesce(nullif(mw.dire_team_tag, ''), 'Dire')
         end,
         'Unknown'
     ) as hero_team_name,

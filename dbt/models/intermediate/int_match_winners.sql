@@ -5,7 +5,7 @@
 }}
 
 -- Determine match winners by analyzing the final state of the game
--- In Dota 2: slots 0-4 are team 0 (Radiant), slots 5-9 are team 1 (Dire)
+-- In Dota 2: slots 0-4 are team 2 (Radiant), slots 5-9 are team 3 (Dire)
 -- We determine the winner by looking at which team destroyed the enemy ancient
 -- This can be inferred from combat log events or by looking at the final game state
 
@@ -14,10 +14,10 @@ with ancient_destruction as (
     select
         match_id,
         case 
-            -- If Dire ancient (npc_dota_badguys_fort) is destroyed, Radiant wins (team 0)
-            when targetname like '%badguys_fort%' or targetname like '%bad_ancient%' then 0
-            -- If Radiant ancient (npc_dota_goodguys_fort) is destroyed, Dire wins (team 1)
-            when targetname like '%goodguys_fort%' or targetname like '%good_ancient%' then 1
+            -- If Dire ancient (npc_dota_badguys_fort) is destroyed, Radiant wins (team 2)
+            when targetname like '%badguys_fort%' or targetname like '%bad_ancient%' then 2
+            -- If Radiant ancient (npc_dota_goodguys_fort) is destroyed, Dire wins (team 3)
+            when targetname like '%goodguys_fort%' or targetname like '%good_ancient%' then 3
             else null
         end as winning_team,
         time as end_time
@@ -44,11 +44,11 @@ final_state as (
 team_final_networth as (
     select
         i.match_id,
-        case when i.slot between 0 and 4 then 0 else 1 end as team,
+        case when i.slot between 0 and 4 then 2 else 3 end as team,
         sum(i.networth) as total_networth
     from {{ ref('stg_interval_events') }} i
     inner join final_state fs on i.match_id = fs.match_id and i.time = fs.game_end_time
-    group by i.match_id, case when i.slot between 0 and 4 then 0 else 1 end
+    group by i.match_id, case when i.slot between 0 and 4 then 2 else 3 end
 ),
 
 networth_winner_ranked as (
@@ -73,8 +73,8 @@ combined_winners as (
         coalesce(ad.match_id, nw.match_id) as match_id,
         coalesce(ad.winning_team, nw.winning_team) as winning_team,
         case 
-            when ad.winning_team is not null then 0
-            else 1
+            when ad.winning_team is not null then 2
+            else 3
         end as winner_priority
     from ancient_destruction ad
     full outer join networth_winner nw on ad.match_id = nw.match_id
@@ -84,8 +84,8 @@ game_info as (
     select
         match_id,
         case
-            when game_winner in (0, 1) then game_winner
-            when game_winner in (2, 3) then game_winner - 2
+            when game_winner in (2, 3) then game_winner
+            when game_winner in (0, 1) then game_winner + 2
             else null
         end as game_winner_normalized,
         radiant_team_id,
@@ -106,14 +106,14 @@ match_winner_candidates as (
         coalesce(
             nullif(
                 case coalesce(gi.game_winner_normalized, cw.winning_team)
-                    when 0 then gi.radiant_team_tag
-                    when 1 then gi.dire_team_tag
+                    when 2 then gi.radiant_team_tag
+                    when 3 then gi.dire_team_tag
                 end,
                 ''
             ),
             case coalesce(gi.game_winner_normalized, cw.winning_team)
-                when 0 then 'Radiant'
-                when 1 then 'Dire'
+                when 2 then 'Radiant'
+                when 3 then 'Dire'
                 else 'Unknown'
             end
         ) as winning_team_name,

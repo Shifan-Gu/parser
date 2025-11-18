@@ -18,11 +18,11 @@ models:
             type: string
             label: "比赛ID"
       - name: winning_team
-        description: Team that won the match (0 = Radiant, 1 = Dire)
+        description: Team that won the match (2 = Radiant, 3 = Dire)
         tests:
           - not_null
           - accepted_values:
-              values: [0, 1]
+              values: [2, 3]
         meta:
           dimension:
             type: number
@@ -58,11 +58,11 @@ models:
             type: string
             label: "英雄中文名"
       - name: team
-        description: Team that picked the hero (0 = Radiant, 1 = Dire)
+        description: Team that picked the hero (2 = Radiant, 3 = Dire)
         tests:
           - not_null
           - accepted_values:
-              values: [0, 1]
+              values: [2, 3]
         meta:
           dimension:
             type: number

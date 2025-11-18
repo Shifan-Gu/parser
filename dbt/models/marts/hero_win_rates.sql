@@ -13,8 +13,8 @@ with hero_stats as (
         count(*) as total_matches,
         sum(case when won then 1 else 0 end) as wins,
         sum(case when not won then 1 else 0 end) as losses,
-        sum(case when won and team = 0 then 1 else 0 end) as wins_radiant,
-        sum(case when won and team = 1 then 1 else 0 end) as wins_dire
+        sum(case when won and team = 2 then 1 else 0 end) as wins_radiant,
+        sum(case when won and team = 3 then 1 else 0 end) as wins_dire
     from {{ ref('fct_hero_match_results') }}
     group by hero_id
 ),

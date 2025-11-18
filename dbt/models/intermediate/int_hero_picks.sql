@@ -6,7 +6,7 @@
 
 -- Map heroes to matches and teams
 -- draft_active_team in the source data indicates which team is picking
--- team 0 is Radiant (slots 0-4), team 1 is Dire (slots 5-9)
+-- team 2 is Radiant (slots 0-4), team 3 is Dire (slots 5-9)
 
 with picks as (
     select
@@ -24,8 +24,8 @@ hero_slot_team as (
         match_id,
         hero_id,
         case 
-            when slot between 0 and 4 then 0
-            when slot between 5 and 9 then 1
+            when slot between 0 and 4 then 2
+            when slot between 5 and 9 then 3
             else null
         end as slot_team
     from (
@@ -50,8 +50,8 @@ select
     p.hero_chinese_name,
     coalesce(
         case 
-            when lower((p.draft_active_team)::text) in ('0', 'radiant', 'team_0', 'false', 'f') then 0
-            when lower((p.draft_active_team)::text) in ('1', 'dire', 'team_1', 'true', 't') then 1
+            when lower((p.draft_active_team)::text) in ('2', 'radiant', 'team_2', 'false', 'f') then 2
+            when lower((p.draft_active_team)::text) in ('3', 'dire', 'team_3', 'true', 't') then 3
             else null
         end,
         h.slot_team
