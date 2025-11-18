@@ -37,7 +37,7 @@ models:
         meta:
           dimension:
             type: number
-            label: "所属队伍"
+            label: "所属阵营编码"
       - name: draft_order
         description: Order in which the hero was picked during the draft phase
         meta:
@@ -57,7 +57,7 @@ models:
         meta:
           dimension:
             type: number
-            label: "获胜队伍"
+            label: "获胜阵营编码"
       - name: winning_team_name
         description: Display name for the winning team
         meta:
