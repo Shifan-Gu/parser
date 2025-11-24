@@ -69,6 +69,44 @@ sources:
           - name: value
             description: Value associated with the event
 
+      - name: game_players
+        description: Normalized player data from game_info
+        columns:
+          - name: id
+            description: Primary key
+          - name: match_id
+            description: Unique identifier for the match
+            tests:
+              - not_null
+          - name: player_slot
+            description: Player slot (0-4 for Radiant, 128-132 for Dire)
+          - name: steam_id
+            description: Steam ID of the player
+          - name: player_name
+            description: Name of the player
+          - name: hero_name
+            description: Name of the hero played
+          - name: game_team
+            description: Team ID (2 = Radiant, 3 = Dire)
+          - name: is_fake_client
+            description: Whether this is a fake client/bot
+
+      - name: game_picks_bans
+        description: Normalized picks and bans data from game_info
+        columns:
+          - name: id
+            description: Primary key
+          - name: match_id
+            description: Unique identifier for the match
+            tests:
+              - not_null
+          - name: is_pick
+            description: Boolean indicating if this is a pick (true) or ban (false)
+          - name: team
+            description: Team making the pick/ban (2 = Radiant, 3 = Dire)
+          - name: hero_id
+            description: Numeric identifier for the hero
+
       - name: game_info
         description: High-level metadata for each parsed match
         columns:
@@ -87,6 +125,10 @@ sources:
             description: Short name for the Radiant team
           - name: dire_team_tag
             description: Short name for the Dire team
+          - name: players
+            description: JSONB array containing player data for all 10 players in the match
+          - name: picks_bans
+            description: JSONB array containing draft picks and bans information
           - name: created_at
             description: Timestamp when the record was created
 

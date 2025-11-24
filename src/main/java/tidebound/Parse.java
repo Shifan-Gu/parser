@@ -1456,6 +1456,16 @@ public class Parse {
                 payload.picksBansJson,
                 payload.rawFileInfoJson
             );
+            
+            // Insert normalized players data
+            if (payload.playersList != null && !payload.playersList.isEmpty()) {
+                gameInfoDAO.insertPlayers(matchId, payload.playersList);
+            }
+            
+            // Insert normalized picks_bans data
+            if (payload.picksBansList != null && !payload.picksBansList.isEmpty()) {
+                gameInfoDAO.insertPicksBans(matchId, payload.picksBansList);
+            }
         } catch (Exception e) {
             System.err.println("Error saving game info to database: " + e.getMessage());
         }
@@ -1522,50 +1532,80 @@ public class Parse {
                 }
                 
                 List<Map<String, Object>> playerEntries = new ArrayList<>();
+                List<GameInfoDAO.PlayerInfo> playersList = new ArrayList<>();
+                int[] radiantPlayerCount = {0};
+                int[] direPlayerCount = {0};
                 for (Demo.CGameInfo.CDotaGameInfo.CPlayerInfo playerInfo : dotaInfo.getPlayerInfoList()) {
                     Map<String, Object> playerData = new LinkedHashMap<>();
+                    GameInfoDAO.PlayerInfo normalizedPlayer = new GameInfoDAO.PlayerInfo();
+                    
                     if (playerInfo.hasSteamid()) {
                         playerData.put("steam_id", playerInfo.getSteamid());
+                        normalizedPlayer.steamId = playerInfo.getSteamid();
                     }
                     if (playerInfo.hasPlayerName()) {
                         playerData.put("player_name", playerInfo.getPlayerName());
+                        normalizedPlayer.playerName = playerInfo.getPlayerName();
                     }
                     if (playerInfo.hasHeroName()) {
                         playerData.put("hero_name", playerInfo.getHeroName());
+                        normalizedPlayer.heroName = playerInfo.getHeroName();
                     }
                     if (playerInfo.hasGameTeam()) {
                         playerData.put("game_team", playerInfo.getGameTeam());
+                        normalizedPlayer.gameTeam = playerInfo.getGameTeam();
+                        
+                        // Calculate player_slot based on team and position within team
+                        if (normalizedPlayer.gameTeam == RADIANT_TEAM_ID) {
+                            normalizedPlayer.playerSlot = radiantPlayerCount[0];
+                            radiantPlayerCount[0]++;
+                        } else if (normalizedPlayer.gameTeam == DIRE_TEAM_ID) {
+                            normalizedPlayer.playerSlot = PLAYER_SLOT_OFFSET + direPlayerCount[0];
+                            direPlayerCount[0]++;
+                        }
                     }
                     if (playerInfo.hasIsFakeClient()) {
                         playerData.put("is_fake_client", playerInfo.getIsFakeClient());
+                        normalizedPlayer.isFakeClient = playerInfo.getIsFakeClient();
                     }
+                    
                     if (!playerData.isEmpty()) {
                         playerEntries.add(playerData);
+                        playersList.add(normalizedPlayer);
                     }
                 }
                 if (!playerEntries.isEmpty()) {
                     payload.playersJson = gson.toJson(playerEntries);
+                    payload.playersList = playersList;
                     dotaMap.put("players", playerEntries);
                 }
                 
                 List<Map<String, Object>> picksBansEntries = new ArrayList<>();
+                List<GameInfoDAO.PickBanInfo> picksBansList = new ArrayList<>();
                 for (Demo.CGameInfo.CDotaGameInfo.CHeroSelectEvent event : dotaInfo.getPicksBansList()) {
                     Map<String, Object> pickBanData = new LinkedHashMap<>();
+                    GameInfoDAO.PickBanInfo normalizedPickBan = new GameInfoDAO.PickBanInfo();
+                    
                     if (event.hasIsPick()) {
                         pickBanData.put("is_pick", event.getIsPick());
+                        normalizedPickBan.isPick = event.getIsPick();
                     }
                     if (event.hasTeam()) {
                         pickBanData.put("team", event.getTeam());
+                        normalizedPickBan.team = event.getTeam();
                     }
                     if (event.hasHeroId()) {
                         pickBanData.put("hero_id", event.getHeroId());
+                        normalizedPickBan.heroId = event.getHeroId();
                     }
                     if (!pickBanData.isEmpty()) {
                         picksBansEntries.add(pickBanData);
+                        picksBansList.add(normalizedPickBan);
                     }
                 }
                 if (!picksBansEntries.isEmpty()) {
                     payload.picksBansJson = gson.toJson(picksBansEntries);
+                    payload.picksBansList = picksBansList;
                     dotaMap.put("picks_bans", picksBansEntries);
                 }
                 
@@ -1600,6 +1640,8 @@ public class Parse {
         String playersJson;
         String picksBansJson;
         String rawFileInfoJson;
+        List<GameInfoDAO.PlayerInfo> playersList;
+        List<GameInfoDAO.PickBanInfo> picksBansList;
     }
     
     private void initializeDatabase() {

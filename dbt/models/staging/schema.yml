@@ -10,7 +10,7 @@ models:
         description: Primary key
         meta:
           dimension:
-            type: string
+            type: number
             label: "主键ID"
       - name: match_id
         description: Unique identifier for the match
@@ -24,6 +24,7 @@ models:
           dimension:
             type: number
             label: "比赛时间（秒）"
+            time_granularities: [raw, second, minute, hour]
       - name: draft_order
         description: Order of the pick in the draft
         meta:
@@ -72,6 +73,7 @@ models:
           dimension:
             type: timestamp
             label: "记录创建时间"
+            time_granularities: [raw, second, minute, hour, day, week, month, quarter, year]
 
   - name: stg_interval_events
     description: Staging model for interval events (periodic snapshots of player state)
@@ -82,7 +84,7 @@ models:
         description: Primary key
         meta:
           dimension:
-            type: string
+            type: number
             label: "主键ID"
       - name: match_id
         description: Unique identifier for the match
@@ -96,6 +98,7 @@ models:
           dimension:
             type: number
             label: "比赛时间（秒）"
+            time_granularities: [raw, second, minute, hour]
       - name: slot
         description: Player slot (0-9, where 0-4 is team 0, 5-9 is team 1)
         meta:
@@ -237,6 +240,7 @@ models:
           dimension:
             type: timestamp
             label: "记录创建时间"
+            time_granularities: [raw, second, minute, hour, day, week, month, quarter, year]
 
   - name: stg_combat_log_events
     description: Staging model for combat log events
@@ -247,7 +251,7 @@ models:
         description: Primary key
         meta:
           dimension:
-            type: string
+            type: number
             label: "主键ID"
       - name: match_id
         description: Unique identifier for the match
@@ -261,6 +265,7 @@ models:
           dimension:
             type: number
             label: "比赛时间（秒）"
+            time_granularities: [raw, second, minute, hour]
       - name: type
         description: Type of combat log event
         meta:
@@ -303,6 +308,7 @@ models:
           dimension:
             type: timestamp
             label: "记录创建时间"
+            time_granularities: [raw, second, minute, hour, day, week, month, quarter, year]
 
   - name: stg_game_info
     description: Staging model for match-level metadata sourced from the game_info table
@@ -313,7 +319,7 @@ models:
         description: Unique identifier linking to game events
         meta:
           dimension:
-            type: string
+            type: number
             label: "比赛ID"
       - name: game_winner
         description: Winning team as recorded by the replay metadata (2 = Radiant, 3 = Dire, or legacy 0/1 values)
@@ -351,4 +357,107 @@ models:
           dimension:
             type: timestamp
             label: "记录创建时间"
+            time_granularities: [raw, second, minute, hour, day, week, month, quarter, year]
+
+  - name: stg_players
+    description: Staging model for players data from normalized game_players table
+    meta:
+      label: "选手信息表"
+    columns:
+      - name: match_id
+        description: Unique identifier for the match
+        tests:
+          - not_null
+        meta:
+          dimension:
+            type: string
+            label: "比赛ID"
+      - name: player_slot
+        description: Player slot (0-4 for Radiant, 128-132 for Dire)
+        meta:
+          dimension:
+            type: number
+            label: "选手槽位"
+      - name: steam_id
+        description: Steam ID of the player
+        meta:
+          dimension:
+            type: string
+            label: "Steam ID"
+      - name: player_name
+        description: Name of the player
+        meta:
+          dimension:
+            type: string
+            label: "选手名称"
+      - name: hero_name
+        description: Name of the hero played
+        meta:
+          dimension:
+            type: string
+            label: "英雄名称"
+      - name: game_team
+        description: Team ID (2 = Radiant, 3 = Dire)
+        meta:
+          dimension:
+            type: number
+            label: "队伍ID"
+      - name: is_fake_client
+        description: Whether this is a fake client/bot
+        meta:
+          dimension:
+            type: boolean
+            label: "是否为假客户端"
+      - name: created_at
+        description: Timestamp when the record was created
+        meta:
+          dimension:
+            type: timestamp
+            label: "记录创建时间"
+            time_granularities: [raw, second, minute, hour, day, week, month, quarter, year]
+
+  - name: stg_picks_bans
+    description: Staging model for picks_bans data from normalized game_picks_bans table
+    meta:
+      label: "选人禁用信息表"
+    columns:
+      - name: match_id
+        description: Unique identifier for the match
+        tests:
+          - not_null
+        meta:
+          dimension:
+            type: string
+            label: "比赛ID"
+      - name: is_pick
+        description: Boolean indicating if this is a pick (true) or ban (false)
+        meta:
+          dimension:
+            type: boolean
+            label: "是否为选人"
+      - name: team
+        description: Team making the pick/ban (2 = Radiant, 3 = Dire)
+        meta:
+          dimension:
+            type: number
+            label: "当前选人阵营编码"
+      - name: hero_id
+        description: Numeric identifier for the hero
+        meta:
+          dimension:
+            type: number
+            label: "英雄ID"
+      - name: hero_chinese_name
+        description: Chinese name of the hero
+        meta:
+          dimension:
+            type: string
+            label: "英雄中文名"
+      - name: created_at
+        description: Timestamp when the record was created
+        meta:
+          dimension:
+            type: timestamp
+            label: "记录创建时间"
+            time_granularities: [raw, second, minute, hour, day, week, month, quarter, year]
 
