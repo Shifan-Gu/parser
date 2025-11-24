@@ -1,6 +1,5 @@
 package tidebound.combatlogvisitors;
 
-import tidebound.Parse.Entry;
 import skadistats.clarity.model.CombatLogEntry;
 
 public interface Visitor<T> {
