@@ -25,12 +25,16 @@ import tidebound.database.DatabaseInitializer;
     
 public class Main {
     
+    // Server configuration
+    private static final int SERVER_PORT = 5600;
+    private static final int REGISTRATION_INTERVAL_MS = 5000;
+    
     // Initialize S3Service once for reuse
     private static final S3Service s3Service = new S3Service();
 
     public static void main(String[] args) throws Exception {
         initializeDatabaseOnStartup();
-        HttpServer server = HttpServer.create(new InetSocketAddress(Integer.valueOf("5600")), 0);
+        HttpServer server = HttpServer.create(new InetSocketAddress(SERVER_PORT), 0);
         server.createContext("/", new MyHandler());
         server.createContext("/healthz", new HealthHandler());
         server.createContext("/blob", new BlobHandler());
@@ -43,7 +47,7 @@ public class Main {
         // Re-register ourselves
         Timer timer = new Timer(); 
         TimerTask task = new RegisterTask(); 
-        timer.schedule(task, 0, 5000);
+        timer.schedule(task, 0, REGISTRATION_INTERVAL_MS);
     }
 
     private static void initializeDatabaseOnStartup() throws Exception {
@@ -70,18 +74,15 @@ public class Main {
     
     static class MyHandler implements HttpHandler {
         @Override
-        public void handle(HttpExchange t) throws IOException {
-            t.sendResponseHeaders(200, 0);
-            InputStream is = t.getRequestBody();
-            OutputStream os = t.getResponseBody();
-            try {
-            	new Parse(is, os);
+        public void handle(HttpExchange exchange) throws IOException {
+            exchange.sendResponseHeaders(200, 0);
+            try (InputStream inputStream = exchange.getRequestBody();
+                 OutputStream outputStream = exchange.getResponseBody()) {
+                new Parse(inputStream, outputStream);
+            } catch (Exception e) {
+                System.err.println("Error parsing replay: " + e.getMessage());
+                e.printStackTrace();
             }
-            catch (Exception e)
-            {
-            	e.printStackTrace();
-            }
-            os.close();
         }
     }
 
@@ -158,12 +159,14 @@ public class Main {
     }
 
     static class HealthHandler implements HttpHandler {
+        private static final byte[] OK_RESPONSE = "ok".getBytes(StandardCharsets.UTF_8);
+        
         @Override
-        public void handle(HttpExchange t) throws IOException {
-            t.sendResponseHeaders(200, 2);
-            OutputStream os = t.getResponseBody();
-            os.write("ok".getBytes());
-            os.close();
+        public void handle(HttpExchange exchange) throws IOException {
+            exchange.sendResponseHeaders(200, OK_RESPONSE.length);
+            try (OutputStream outputStream = exchange.getResponseBody()) {
+                outputStream.write(OK_RESPONSE);
+            }
         }
     }
 

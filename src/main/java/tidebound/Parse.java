@@ -7,10 +7,14 @@ import skadistats.clarity.model.Entity;
 import skadistats.clarity.model.FieldPath;
 import skadistats.clarity.model.StringTable;
 import skadistats.clarity.processor.entities.Entities;
+import skadistats.clarity.processor.entities.OnEntityCreated;
+import skadistats.clarity.processor.entities.OnEntityDeleted;
 import skadistats.clarity.processor.entities.OnEntityEntered;
+import skadistats.clarity.processor.entities.OnEntityUpdated;
 import skadistats.clarity.processor.entities.UsesEntities;
 import skadistats.clarity.processor.gameevents.OnCombatLogEntry;
 import skadistats.clarity.processor.reader.OnMessage;
+import skadistats.clarity.processor.reader.OnTickEnd;
 import skadistats.clarity.processor.reader.OnTickStart;
 import skadistats.clarity.processor.runner.Context;
 import skadistats.clarity.processor.runner.SimpleRunner;
@@ -40,14 +44,93 @@ import java.sql.SQLException;
 import tidebound.combatlogvisitors.TrackVisitor;
 import tidebound.combatlogvisitors.GreevilsGreedVisitor;
 import tidebound.combatlogvisitors.TrackVisitor.TrackStatus;
-import tidebound.processors.warding.OnWardExpired;
-import tidebound.processors.warding.OnWardKilled;
-import tidebound.processors.warding.OnWardPlaced;
 import tidebound.database.GameEventDAO;
+import skadistats.clarity.wire.dota.common.proto.DOTAUserMessages;
 import tidebound.database.GameInfoDAO;
 import tidebound.database.DatabaseInitializer;
 
 public class Parse {
+    
+    // Constants
+    private static final float INTERVAL_SECONDS = 1.0f;
+    private static final float CELL_SIZE = 128.0f;
+    private static final int NUM_PLAYERS = 10;
+    private static final int MAX_PLAYER_SEARCH_INDEX = 30;
+    private static final int DRAFT_HEROES_ARRAY_SIZE = 24;
+    private static final int MAX_ABILITIES = 32;
+    private static final int MAX_INVENTORY_SLOTS = 8;
+    private static final int INVALID_HANDLE = 0xFFFFFF;
+    private static final int TICKS_PER_SECOND = 30;
+    private static final int MAX_PING_COUNT = 10000;
+    private static final int DEFAULT_BATCH_SIZE = 1000;
+    private static final long STEAM_ID_OFFSET = 76561197960265728L;
+    private static final int RADIANT_TEAM_ID = 2;
+    private static final int DIRE_TEAM_ID = 3;
+    private static final int WAITING_FOR_DRAFT_TEAM_ID = 14;
+    private static final int PLAYER_SLOT_OFFSET = 128;
+    private static final int GAME_STATE_POST_GAME = 6;
+    private static final int GAME_STATE_PRE_GAME = 5;
+    private static final int DRAFT_STAGE = 2;
+    private static final int LIFE_STATE_ALIVE = 0;
+    private static final int LIFE_STATE_DEAD = 1;
+    private static final int LIFE_STATE_RESPAWNING = 2;
+    private static final int COMBAT_LOG_TYPE_THRESHOLD = 19;
+    private static final int CHAT_CHANNEL_TYPE_ALL_CHAT = 11;
+    private static final int FACET_KEY_HERO_ID_SHIFT = 32;
+    private static final int FACET_KEY_VARIANT_MASK = 0xFF;
+    
+    // Entity class names
+    private static final String ENTITY_WEARABLE_ITEM = "CDOTAWearableItem";
+    private static final String ENTITY_GAMERULES_PROXY = "CDOTAGamerulesProxy";
+    private static final String ENTITY_PLAYER_RESOURCE = "CDOTA_PlayerResource";
+    private static final String ENTITY_DATA_RADIANT = "CDOTA_DataRadiant";
+    private static final String ENTITY_DATA_DIRE = "CDOTA_DataDire";
+    private static final String ENTITY_PREFIX_ITEM = "CDOTA_Item_";
+    private static final String ENTITY_PREFIX_HERO = "CDOTA_Unit_Hero_";
+    private static final String ENTITY_PREFIX_COMBAT_LOG_HERO = "npc_dota_hero_";
+    
+    // Property names
+    private static final String PROPERTY_PLAYER_ID = "m_nPlayerID";
+    private static final String PROPERTY_PLAYER_ID_OLD = "m_iPlayerID";
+    private static final String PROPERTY_PLAYER_OWNER_ID = "m_iPlayerOwnerID";
+    private static final String PROPERTY_CURSOR_X = "m_iCursor.0000";
+    private static final String PROPERTY_CURSOR_Y = "m_iCursor.0001";
+    private static final String PROPERTY_ASSIGNED_HERO = "m_hAssignedHero";
+    private static final String PROPERTY_GAME_TIME = "m_pGameRules.m_fGameTime";
+    private static final String PROPERTY_GAME_PAUSED = "m_pGameRules.m_bGamePaused";
+    private static final String PROPERTY_PAUSE_START_TICK = "m_pGameRules.m_nPauseStartTick";
+    private static final String PROPERTY_TOTAL_PAUSED_TICKS = "m_pGameRules.m_nTotalPausedTicks";
+    private static final String PROPERTY_GAME_START_TIME = "m_pGameRules.m_flGameStartTime";
+    private static final String PROPERTY_GAME_STATE = "m_pGameRules.m_nGameState";
+    private static final String PROPERTY_PLAYER_IDS_IN_CONTROL = "m_pGameRules.m_iPlayerIDsInControl";
+    private static final String PROPERTY_ACTIVE_TEAM = "m_pGameRules.m_iActiveTeam";
+    private static final String PROPERTY_EXTRA_TIME_REMAINING = "m_pGameRules.m_fExtraTimeRemaining";
+    private static final String PROPERTY_BANNED_HEROES = "m_pGameRules.m_BannedHeroes";
+    private static final String PROPERTY_SELECTED_HEROES = "m_pGameRules.m_SelectedHeroes";
+    private static final String PROPERTY_CELL_X = "CBodyComponent.m_cellX";
+    private static final String PROPERTY_CELL_Y = "CBodyComponent.m_cellY";
+    private static final String PROPERTY_CELL_Z = "CBodyComponent.m_cellZ";
+    private static final String PROPERTY_VEC_X = "CBodyComponent.m_vecX";
+    private static final String PROPERTY_VEC_Y = "CBodyComponent.m_vecY";
+    private static final String PROPERTY_VEC_Z = "CBodyComponent.m_vecZ";
+    private static final String PROPERTY_LIFE_STATE = "m_lifeState";
+    private static final String PROPERTY_HERO_FACET_KEY = "m_iHeroFacetKey";
+    private static final String PROPERTY_OWNER_ENTITY = "m_hOwnerEntity";
+    private static final String PROPERTY_ITEMS = "m_hItems";
+    private static final String PROPERTY_ABILITIES = "m_hAbilities";
+    private static final String PROPERTY_ABILITIES_VEC = "m_vecAbilities";
+    private static final String PROPERTY_ENTITY_NAME_INDEX = "m_pEntity.m_nameStringableIndex";
+    private static final String PROPERTY_CURRENT_CHARGES = "m_iCurrentCharges";
+    private static final String PROPERTY_SECONDARY_CHARGES = "m_iSecondaryCharges";
+    private static final String PROPERTY_ABILITY_LEVEL = "m_iLevel";
+    private static final String PROPERTY_ACCOUNT_ID = "m_iAccountID";
+    private static final String PROPERTY_ITEM_DEFINITION_INDEX = "m_iItemDefinitionIndex";
+    private static final String PROPERTY_NEUTRAL_ACTIVE_DROP = "m_bIsNeutralActiveDrop";
+    private static final String PROPERTY_NEUTRAL_PASSIVE_DROP = "m_bIsNeutralPassiveDrop";
+    private static final String PROPERTY_NEUTRAL_DROP_TEAM = "m_nNeutralDropTeam";
+    
+    // String table name
+    private static final String STRING_TABLE_ENTITY_NAMES = "EntityNames";
 
     public class Entry {
         public Integer time = 0;
@@ -136,8 +219,18 @@ public class Parse {
         }
     }
 
-    private Float getPreciseLocation (Integer cell, Float vec) {
-      return (cell*128.0f+vec)/128;
+    /**
+     * Calculates precise location from cell coordinates and vector offset.
+     * 
+     * @param cell Cell coordinate
+     * @param vec Vector offset within the cell
+     * @return Precise location coordinate
+     */
+    private Float getPreciseLocation(Integer cell, Float vec) {
+        if (cell == null || vec == null) {
+            return null;
+        }
+        return (cell * CELL_SIZE + vec) / CELL_SIZE;
     }
 
     private class Item {
@@ -155,7 +248,6 @@ public class Parse {
     private class Ability {
         String id;
         Integer abilityLevel;
-
     }
 
     private class UnknownItemFoundException extends RuntimeException {
@@ -170,68 +262,119 @@ public class Parse {
         }
     }
 
-    float INTERVAL = 1;
-    float nextInterval = 0;
-    Integer time = 0;
-    int numPlayers = 10;
-    int[] validIndices = new int[numPlayers];
-    boolean init = false;
-    int gameStartTime = 0;
-    boolean postGame = false; // true when ancient destroyed
-    boolean epilogue = false;
-    private Gson g = new Gson();
-    HashMap<String, Integer> name_to_slot = new HashMap<String, Integer>();
-    HashMap<String, Integer> abilities_tracking = new HashMap<String, Integer>();
-    List<Ability> abilities;
-    HashMap<Integer, Integer> slot_to_playerslot = new HashMap<Integer, Integer>();
-    HashMap<Long, Integer> steamid_to_playerslot = new HashMap<Long, Integer>();
-    HashMap<Integer, Integer> cosmeticsMap = new HashMap<Integer, Integer>();
-    HashMap<Integer, Integer> dotaplusxpMap = new HashMap<Integer, Integer>(); // playerslot, xp
-    HashMap<Integer, Integer> ward_ehandle_to_slot = new HashMap<Integer, Integer>();
-    InputStream is = null;
-    OutputStream os = null;
-    private GreevilsGreedVisitor greevilsGreedVisitor;
-    private TrackVisitor trackVisitor;
-    private ArrayList<Boolean> isPlayerStartingItemsWritten;
-    int pingCount = 0;
-    private ArrayList<Entry> logBuffer = new ArrayList<Entry>();
+    // Game state tracking
+    private float nextInterval = 0;
+    private Integer time = 0;
+    private int[] validIndices = new int[NUM_PLAYERS];
+    private boolean initialized = false;
+    private int gameStartTime = 0;
+    private boolean postGame = false; // true when ancient destroyed
+    private boolean epilogue = false;
+    private int serverTick = 0;
+    
+    // JSON serialization
+    private final Gson gson = new Gson();
+    
+    // Player and entity mappings
+    private final HashMap<String, Integer> nameToSlot = new HashMap<>();
+    private final Map<String, Integer> abilitiesTracking = new HashMap<>();
+    private List<Ability> abilities;
+    private final Map<Integer, Integer> slotToPlayerSlot = new HashMap<>();
+    private final Map<Long, Integer> steamIdToPlayerSlot = new HashMap<>();
+    private final Map<Integer, Integer> cosmeticsMap = new HashMap<>();
+    private final Map<Integer, Integer> dotaPlusXpMap = new HashMap<>(); // playerslot, xp
+    private final Map<Integer, Integer> wardEhandleToSlot = new HashMap<>();
+    
+    // I/O streams
+    private final InputStream inputStream;
+    private final OutputStream outputStream;
+    
+    // Visitors for combat log processing
+    private final GreevilsGreedVisitor greevilsGreedVisitor;
+    private final TrackVisitor trackVisitor;
+    
+    // Player state tracking
+    private final List<Boolean> isPlayerStartingItemsWritten;
+    private int pingCount = 0;
+    private List<Entry> logBuffer = new ArrayList<>();
     private final List<Entry> pendingDatabaseEvents = new ArrayList<>();
-    int serverTick = 0;
+    
+    // Ward tracking fields (consolidated from Wards.java)
+    private static final Map<String, String> WARDS_TARGET_NAME_BY_DT_CLASS;
+    private static final Set<String> WARDS_DT_CLASSES;
+    private static final Set<String> WARDS_TARGET_NAMES;
+    
+    static {
+        final String TARGET_NAME_OBSERVER = "npc_dota_observer_wards";
+        final String TARGET_NAME_SENTRY = "npc_dota_sentry_wards";
+        HashMap<String, String> target_by_dtclass = new HashMap<>(4);
+        
+        target_by_dtclass.put("DT_DOTA_NPC_Observer_Ward", TARGET_NAME_OBSERVER);
+        target_by_dtclass.put("CDOTA_NPC_Observer_Ward", TARGET_NAME_OBSERVER);
+        target_by_dtclass.put("DT_DOTA_NPC_Observer_Ward_TrueSight", TARGET_NAME_SENTRY);
+        target_by_dtclass.put("CDOTA_NPC_Observer_Ward_TrueSight", TARGET_NAME_SENTRY);
+        
+        WARDS_TARGET_NAME_BY_DT_CLASS = Collections.unmodifiableMap(target_by_dtclass);
+        WARDS_DT_CLASSES = Collections.unmodifiableSet(target_by_dtclass.keySet());
+        WARDS_TARGET_NAMES = Collections.unmodifiableSet(new HashSet<>(target_by_dtclass.values()));
+    }
+    
+    private final Map<Integer, FieldPath> wardLifeStatePaths = new HashMap<>();
+    private final Map<Integer, Integer> wardCurrentLifeState = new HashMap<>();
+    private final Map<String, Queue<String>> wardKillersByWardClass = new HashMap<>();
+    private Queue<WardProcessEntityCommand> wardToProcess = new ArrayDeque<>();
+    
+    private class WardProcessEntityCommand {
+        private final Entity entity;
+        private final FieldPath fieldPath;
+        
+        public WardProcessEntityCommand(Entity e, FieldPath p) {
+            entity = e;
+            fieldPath = p;
+        }
+    }
     
     // Database integration
     private GameEventDAO gameEventDAO;
     private GameInfoDAO gameInfoDAO;
     private Long matchId;
     private boolean databaseEnabled;
-    private int batchSize = 1000;
+    private final int batchSize = DEFAULT_BATCH_SIZE;
     private int currentBatchSize = 0;
 
-    // Draft stage variable
-    boolean[] draftOrderProcessed = new boolean[24];
-    int order = 1;
-    boolean isDraftStartTimeProcessed = false; // flag to know if draft start time is already handled
+    // Draft stage tracking
+    private final boolean[] draftOrderProcessed = new boolean[DRAFT_HEROES_ARRAY_SIZE];
+    private int draftOrder = 1;
+    private boolean isDraftStartTimeProcessed = false;
 
-    boolean isDotaPlusProcessed = false;
+    // Dota Plus tracking
+    private boolean isDotaPlusProcessed = false;
 
-    // Variables to track pause timings
-    boolean wasPaused = false;
-    int pauseStartTime = 0;
-    int pauseStartGameTime = 0;
+    // Pause timing tracking
+    private boolean wasPaused = false;
+    private int pauseStartTime = 0;
+    private int pauseStartGameTime = 0;
 
     public Parse(InputStream input, OutputStream output) throws IOException {
-        greevilsGreedVisitor = new GreevilsGreedVisitor(name_to_slot);
+        this.inputStream = input;
+        this.outputStream = output;
+        
+        greevilsGreedVisitor = new GreevilsGreedVisitor(nameToSlot);
         trackVisitor = new TrackVisitor();
 
-        is = input;
-        os = output;
-        isPlayerStartingItemsWritten = new ArrayList<>(Arrays.asList(new Boolean[numPlayers]));
+        isPlayerStartingItemsWritten = new ArrayList<>(Arrays.asList(new Boolean[NUM_PLAYERS]));
         Collections.fill(isPlayerStartingItemsWritten, Boolean.FALSE);
+        
+        // Initialize ward tracking
+        WARDS_TARGET_NAMES.forEach((cls) -> {
+            wardKillersByWardClass.put(cls, new ArrayDeque<>());
+        });
         
         // Initialize database connection
         initializeDatabase();
         
-        long tStart = System.currentTimeMillis();
-        new SimpleRunner(new InputStreamSource(is)).runWith(this);
+        long startTime = System.currentTimeMillis();
+        new SimpleRunner(new InputStreamSource(inputStream)).runWith(this);
         
         // Flush any remaining database operations
         if (databaseEnabled) {
@@ -259,32 +402,37 @@ public class Parse {
             }
         }
         
-        long tMatch = System.currentTimeMillis() - tStart;
-        System.err.format("total time taken: %s\n", (tMatch) / 1000.0);
+        long totalTime = System.currentTimeMillis() - startTime;
+        System.err.format("total time taken: %s\n", totalTime / 1000.0);
     }
 
-    public void output(Entry e) {
+    /**
+     * Outputs an entry to the output stream and optionally to the database.
+     * 
+     * @param entry The entry to output
+     */
+    public void output(Entry entry) {
         try {
             if (!epilogue && gameStartTime == 0 && logBuffer != null) {
-                logBuffer.add(e);
+                logBuffer.add(entry);
             } else {
-                e.time -= gameStartTime;
-                this.os.write((g.toJson(e) + "\n").getBytes());
+                entry.time -= gameStartTime;
+                outputStream.write((gson.toJson(entry) + "\n").getBytes());
                 
                 // Save to database if enabled
                 if (databaseEnabled) {
                     try {
-                        enqueueDatabaseEvent(e);
+                        enqueueDatabaseEvent(entry);
                     } catch (Exception ex) {
                         System.err.println("Error saving event to database: " + ex.getMessage());
-                        pendingDatabaseEvents.add(e);
+                        pendingDatabaseEvents.add(entry);
                     }
                 }
             }
         } catch (IOException ex) {
-            // System.err.println(ex);
+            System.err.println("Error writing entry to output stream: " + ex.getMessage());
         } catch (IllegalArgumentException iex) {
-            System.err.println(iex);
+            System.err.println("Invalid argument in entry: " + iex.getMessage());
         }
     }
 
@@ -298,47 +446,31 @@ public class Parse {
         logBuffer = null;
     }
 
-    // @OnMessage(GeneratedMessage.class)
-    public void onMessage(Context ctx, GeneratedMessage message) {
-        System.err.println(message.getClass().getName());
-        System.out.println(message.toString());
-    }
-
-    /*
-     * @OnMessage(DotaUserMessages.CDOTAUserMsg_SpectatorPlayerClick.class)
-     * public void onSpectatorPlayerClick(Context ctx,
-     * DotaUserMessages.CDOTAUserMsg_SpectatorPlayerClick message){
-     * Entry entry = new Entry(time);
-     * entry.type = "clicks";
-     * //need to get the entity by index
-     * entry.key = String.valueOf(message.getOrderType());
-     * 
-     * Entity e =
-     * ctx.getProcessor(Entities.class).getByIndex(message.getEntindex());
-     * entry.x = getEntityProperty(e, "m_iCursor.0000", null);
-     * entry.y = getEntityProperty(e, "m_iCursor.0001", null);
-     * entry.slot = getEntityProperty(e, "m_iPlayerID", null);
-     * //theres also target_index
-     * output(entry);
-     * }
-     */
 
     @OnMessage(CMsgDOTAMatch.class)
     public void onDotaMatch(Context ctx, CMsgDOTAMatch message) {
-        // TODO could use this for match overview data for uploads
-        // System.err.println(message);
+        // Could use this for match overview data for uploads
+        // Currently not used
     }
 
-    public Integer getPlayerSlotFromEntity(Context ctx, Entity e) {
-        if (e == null)
+    /**
+     * Extracts player slot from an entity.
+     * 
+     * @param ctx Context
+     * @param entity Entity to extract slot from
+     * @return Player slot or null if not found
+     */
+    public Integer getPlayerSlotFromEntity(Context ctx, Entity entity) {
+        if (entity == null) {
             return null;
-        Integer slot = getEntityProperty(e, "m_nPlayerID", null);
+        }
+        Integer slot = getEntityProperty(entity, PROPERTY_PLAYER_ID, null);
         // Sentry wards still use pre 7.31 property for storing new ID
         if (slot == null) {
-            slot = getEntityProperty(e, "m_iPlayerID", null);
+            slot = getEntityProperty(entity, PROPERTY_PLAYER_ID_OLD, null);
         }
         if (slot == null) {
-            slot = getEntityProperty(e, "m_iPlayerOwnerID", null);
+            slot = getEntityProperty(entity, PROPERTY_PLAYER_OWNER_ID, null);
         }
         if (slot != null) {
             slot /= 2;
@@ -365,27 +497,15 @@ public class Parse {
 
     @OnMessage(CDOTAUserMsg_LocationPing.class)
     public void onPlayerPing(Context ctx, CDOTAUserMsg_LocationPing message) {
-        pingCount += 1;
-        if (pingCount > 10000) {
+        pingCount++;
+        if (pingCount > MAX_PING_COUNT) {
             return;
         }
 
         Entry entry = new Entry(time);
         entry.type = "pings";
         entry.slot = message.getPlayerId();
-        /*
-         * System.err.println(message);
-         * player_id: 7
-         * location_ping {
-         * x: 5871
-         * y: 6508
-         * target: -1
-         * direct_ping: false
-         * type: 0
-         * }
-         */
-        // we could get the ping coordinates/type if we cared
-        // entry.key = String.valueOf(message.getOrderType());
+        // Could get the ping coordinates/type if needed
         output(entry);
     }
 
@@ -406,10 +526,10 @@ public class Parse {
     // New chat event
     @OnMessage(CDOTAUserMsg_ChatMessage.class)
     public void onAllChatMessage(Context ctx, CDOTAUserMsg_ChatMessage message) {
-        int type = message.getChannelType();
+        int channelType = message.getChannelType();
         Entry entry = new Entry(time);
         entry.slot = message.getSourcePlayerId();
-        entry.type = (type == 11) ? "chat" : String.valueOf(type);
+        entry.type = (channelType == CHAT_CHANNEL_TYPE_ALL_CHAT) ? "chat" : String.valueOf(channelType);
         entry.key = message.getMessageText();
         output(entry);
     }
@@ -445,30 +565,22 @@ public class Parse {
 
     @OnMessage(CDemoFileInfo.class)
     public void onFileInfo(Context ctx, CDemoFileInfo message) {
-        // beware of 4.2b limit! we don't currently do anything with this, so we might
-        // be able to just remove this
-        // we can't use the value field since it takes Integers
-        // Entry matchIdEntry = new Entry();
-        // matchIdEntry.type = "match_id";
-        // matchIdEntry.value = message.getGameInfo().getDota().getMatchId();
-        // output(matchIdEntry);
-
         // Extracted cosmetics data from CDOTAWearableItem entities
         Entry cosmeticsEntry = new Entry();
         cosmeticsEntry.type = "cosmetics";
-        cosmeticsEntry.key = new Gson().toJson(cosmeticsMap);
+        cosmeticsEntry.key = gson.toJson(cosmeticsMap);
         output(cosmeticsEntry);
 
         // Dota plus hero levels
         Entry dotaPlusEntry = new Entry();
         dotaPlusEntry.type = "dotaplus";
-        dotaPlusEntry.key = new Gson().toJson(dotaplusxpMap);
+        dotaPlusEntry.key = gson.toJson(dotaPlusXpMap);
         output(dotaPlusEntry);
 
-        // emit epilogue event to mark finish
+        // Emit epilogue event to mark finish
         Entry epilogueEntry = new Entry();
         epilogueEntry.type = "epilogue";
-        epilogueEntry.key = new Gson().toJson(message);
+        epilogueEntry.key = gson.toJson(message);
         output(epilogueEntry);
         
         persistGameInfo(message);
@@ -482,6 +594,15 @@ public class Parse {
     public void onCombatLogEntry(Context ctx, CombatLogEntry cle) {
         try {
             time = Math.round(cle.getTimestamp());
+            
+            // Handle ward death tracking (from Wards.java)
+            if (isWardDeath(cle)) {
+                String killer;
+                if ((killer = cle.getDamageSourceName()) != null) {
+                    wardKillersByWardClass.get(cle.getTargetName()).add(killer);
+                }
+            }
+            
             // create a new entry
             Entry combatLogEntry = new Entry(time);
             combatLogEntry.type = cle.getType().name();
@@ -520,17 +641,18 @@ public class Parse {
                 combatLogEntry.tracked_death = trackStatus.tracked;
                 combatLogEntry.tracked_sourcename = trackStatus.inflictor;
             }
-            if (combatLogEntry.type.equals("DOTA_COMBATLOG_GAME_STATE") && combatLogEntry.value == 6) {
-                postGame = true;
-            }
-            if (combatLogEntry.type.equals("DOTA_COMBATLOG_GAME_STATE") && combatLogEntry.value == 5) {
-                // See alternative gameStartTime from grp
-                if (gameStartTime == 0) {
-                    gameStartTime = combatLogEntry.time;
-                    flushLogBuffer();
+            if (combatLogEntry.type.equals("DOTA_COMBATLOG_GAME_STATE")) {
+                if (combatLogEntry.value == GAME_STATE_POST_GAME) {
+                    postGame = true;
+                } else if (combatLogEntry.value == GAME_STATE_PRE_GAME) {
+                    // See alternative gameStartTime from gameRulesProxy
+                    if (gameStartTime == 0) {
+                        gameStartTime = combatLogEntry.time;
+                        flushLogBuffer();
+                    }
                 }
             }
-            if (cle.getType().ordinal() <= 19) {
+            if (cle.getType().ordinal() <= COMBAT_LOG_TYPE_THRESHOLD) {
                 output(combatLogEntry);
             }
         } catch (Exception e) {
@@ -540,39 +662,54 @@ public class Parse {
     }
 
     @OnEntityEntered
-    public void onEntityEntered(Context ctx, Entity e) {
-        String entityName = e.getDtClass().getDtName();
+    public void onEntityEntered(Context ctx, Entity entity) {
+        String entityName = entity.getDtClass().getDtName();
 
-        if (entityName.equals("CDOTAWearableItem")) {
-            Integer accountId = getEntityProperty(e, "m_iAccountID", null);
-            Integer itemDefinitionIndex = getEntityProperty(e, "m_iItemDefinitionIndex", null);
-            // System.err.format("%s,%s\n", accountId, itemDefinitionIndex);
-            if (accountId > 0) {
-                // Get the owner (a hero entity)
-                Long accountId64 = 76561197960265728L + accountId;
-                Integer playerSlot = steamid_to_playerslot.get(accountId64);
+        if (ENTITY_WEARABLE_ITEM.equals(entityName)) {
+            handleWearableItem(ctx, entity);
+        } else if (entityName.startsWith(ENTITY_PREFIX_ITEM + "Tier") && entityName.endsWith("Token")) {
+            handleNeutralToken(ctx, entity, entityName);
+        } else if (entityName.startsWith(ENTITY_PREFIX_ITEM)) {
+            handleNeutralItem(ctx, entity, entityName);
+        }
+    }
+    
+    private void handleWearableItem(Context ctx, Entity entity) {
+        Integer accountId = getEntityProperty(entity, PROPERTY_ACCOUNT_ID, null);
+        Integer itemDefinitionIndex = getEntityProperty(entity, PROPERTY_ITEM_DEFINITION_INDEX, null);
+        if (accountId != null && accountId > 0 && itemDefinitionIndex != null) {
+            Long accountId64 = STEAM_ID_OFFSET + (long) accountId;
+            Integer playerSlot = steamIdToPlayerSlot.get(accountId64);
+            if (playerSlot != null) {
                 cosmeticsMap.put(itemDefinitionIndex, playerSlot);
             }
-        } else if (entityName.startsWith("CDOTA_Item_Tier") && entityName.endsWith("Token")) {
+        }
+    }
+    
+    private void handleNeutralToken(Context ctx, Entity entity, String entityName) {
+        Entry entry = new Entry(time);
+        entry.type = "neutral_token";
+        entry.slot = getPlayerSlotFromEntity(ctx, entity);
+        entry.key = entityName.substring(ENTITY_PREFIX_ITEM.length());
+        output(entry);
+    }
+    
+    private void handleNeutralItem(Context ctx, Entity entity, String entityName) {
+        Boolean isNeutralActiveDrop = getEntityProperty(entity, PROPERTY_NEUTRAL_ACTIVE_DROP, null);
+        Boolean isNeutralPassiveDrop = getEntityProperty(entity, PROPERTY_NEUTRAL_PASSIVE_DROP, null);
+        Integer neutralDropTeam = getEntityProperty(entity, PROPERTY_NEUTRAL_DROP_TEAM, null);
+        
+        boolean isNeutralDrop = (isNeutralActiveDrop != null && isNeutralActiveDrop) 
+            || (isNeutralPassiveDrop != null && isNeutralPassiveDrop);
+        
+        if (neutralDropTeam != null && neutralDropTeam != 0 && isNeutralDrop) {
             Entry entry = new Entry(time);
-            entry.type = "neutral_token";
-            entry.slot = getPlayerSlotFromEntity(ctx, e);
-            entry.key = entityName.substring("CDOTA_Item_".length()); // Tier1Token
+            entry.type = "neutral_item_history";
+            entry.slot = getPlayerSlotFromEntity(ctx, entity);
+            entry.key = entityName.substring(ENTITY_PREFIX_ITEM.length());
+            entry.isNeutralActiveDrop = isNeutralActiveDrop;
+            entry.isNeutralPassiveDrop = isNeutralPassiveDrop;
             output(entry);
-        } else if (entityName.startsWith("CDOTA_Item_")) {
-            Boolean isNeutralActiveDrop = getEntityProperty(e, "m_bIsNeutralActiveDrop", null);
-            Boolean isNeutralPassiveDrop = getEntityProperty(e, "m_bIsNeutralPassiveDrop", null);
-            Integer neutralDropTeam = getEntityProperty(e, "m_nNeutralDropTeam", null);
-            if ((neutralDropTeam != null && neutralDropTeam != 0) && ((isNeutralActiveDrop != null && isNeutralActiveDrop) || (isNeutralPassiveDrop != null && isNeutralPassiveDrop == true))) {
-                Entry entry = new Entry(time);
-                entry.type = "neutral_item_history";
-                entry.slot = getPlayerSlotFromEntity(ctx, e);
-                entry.key = entityName.substring("CDOTA_Item_".length());
-                entry.isNeutralActiveDrop = isNeutralActiveDrop;
-                entry.isNeutralPassiveDrop = isNeutralPassiveDrop;
-                // System.out.println(new Gson().toJson(entry));
-                output(entry);
-            }
         }
     }
 
@@ -581,49 +718,26 @@ public class Parse {
         serverTick = message.getTick();
     }
 
-    @UsesStringTable("EntityNames")
+    @UsesStringTable(STRING_TABLE_ENTITY_NAMES)
     @UsesEntities
     @OnTickStart
     public void onTickStart(Context ctx, boolean synthetic) {
-        /*
-         * Iterator<Entity> cosmetics =
-         * ctx.getProcessor(Entities.class).getAllByDtName("CDOTAWearableItem");
-         * while ( cosmetics.hasNext() )
-         * {
-         * Entity e = cosmetics.next();
-         * Integer accountId = getEntityProperty(e, "m_iAccountID", null);
-         * Integer itemDefinitionIndex = getEntityProperty(e, "m_iItemDefinitionIndex",
-         * null);
-         * if (itemDefinitionIndex == 7559)
-         * {
-         * System.err.format("%s,%s\n", accountId, itemDefinitionIndex);
-         * }
-         * }
-         */
+        Entities entities = ctx.getProcessor(Entities.class);
+        Entity gameRulesProxy = entities.getByDtName(ENTITY_GAMERULES_PROXY);
+        Entity playerResource = entities.getByDtName(ENTITY_PLAYER_RESOURCE);
+        Entity dataDire = entities.getByDtName(ENTITY_DATA_DIRE);
+        Entity dataRadiant = entities.getByDtName(ENTITY_DATA_RADIANT);
 
-        // TODO check engine to decide whether to use s1 or s2 entities
-        // ctx.getEngineType()
+        Integer draftStage = getEntityProperty(gameRulesProxy, PROPERTY_GAME_STATE, null);
 
-        // s1 DT_DOTAGameRulesProxy
-        Entity grp = ctx.getProcessor(Entities.class).getByDtName("CDOTAGamerulesProxy");
-        Entity pr = ctx.getProcessor(Entities.class).getByDtName("CDOTA_PlayerResource");
-        Entity dData = ctx.getProcessor(Entities.class).getByDtName("CDOTA_DataDire");
-        Entity rData = ctx.getProcessor(Entities.class).getByDtName("CDOTA_DataRadiant");
-
-        // Create draftStage variable
-        Integer draftStage = getEntityProperty(grp, "m_pGameRules.m_nGameState", null);
-
-        if (grp != null) {
-            // System.err.println(grp);
-            // dota_gamerules_data.m_iGameMode = 22
-            // dota_gamerules_data.m_unMatchID64 = 1193091757
-            Float oldTime = getEntityProperty(grp, "m_pGameRules.m_fGameTime", null);
+        if (gameRulesProxy != null) {
+            Float oldTime = getEntityProperty(gameRulesProxy, PROPERTY_GAME_TIME, null);
             if (oldTime == null) {
                 // 7.32e on, need to calculate time manually
-                boolean isPaused = getEntityProperty(grp, "m_pGameRules.m_bGamePaused", null);
-                int timeTick = isPaused ? getEntityProperty(grp, "m_pGameRules.m_nPauseStartTick", null) : serverTick;
-                int pausedTicks = getEntityProperty(grp, "m_pGameRules.m_nTotalPausedTicks", null);
-                time = Math.round((float) (timeTick - pausedTicks) / 30);
+                boolean isPaused = getEntityProperty(gameRulesProxy, PROPERTY_GAME_PAUSED, null);
+                int timeTick = isPaused ? getEntityProperty(gameRulesProxy, PROPERTY_PAUSE_START_TICK, null) : serverTick;
+                int pausedTicks = getEntityProperty(gameRulesProxy, PROPERTY_TOTAL_PAUSED_TICKS, null);
+                time = Math.round((float) (timeTick - pausedTicks) / TICKS_PER_SECOND);
 
                 // Tracking game pauses
                 if (isPaused && !wasPaused) {
@@ -633,7 +747,7 @@ public class Parse {
                     wasPaused = true;
                 } else if (!isPaused && wasPaused) {
                     // Game just got unpaused
-                    int pauseDuration = Math.round((float) (timeTick - pauseStartTime) / 30);
+                    int pauseDuration = Math.round((float) (timeTick - pauseStartTime) / TICKS_PER_SECOND);
                     if (pauseDuration > 0) {
                         Entry pauseEntry = new Entry(pauseStartGameTime);
                         pauseEntry.type = "game_paused";
@@ -643,349 +757,341 @@ public class Parse {
                     }
                     wasPaused = false;
                 }
-
             } else {
                 time = Math.round(oldTime);
             }
-            // alternate to combat log for getting game zero time (looks like this is set at
-            // the same time as the game start, so it's not any better for streaming)
-            // Some replays don't have the combat log event for some reason so also do this
-            // here
-            int currGameStartTime = Math.round((float) grp.getProperty("m_pGameRules.m_flGameStartTime"));
-            if (gameStartTime == 0 && currGameStartTime != 0) {
-                gameStartTime = currGameStartTime;
+            
+            // Alternate to combat log for getting game zero time
+            // Some replays don't have the combat log event for some reason so also do this here
+            int currentGameStartTime = Math.round((float) gameRulesProxy.getProperty(PROPERTY_GAME_START_TIME));
+            if (gameStartTime == 0 && currentGameStartTime != 0) {
+                gameStartTime = currentGameStartTime;
                 flushLogBuffer();
             }
-            if (draftStage == 2) {
+            
+            if (draftStage == DRAFT_STAGE) {
 
-                // determine the time the draftings start
-                if (!isDraftStartTimeProcessed) {
-                    Long iPlayerIDsInControl = getEntityProperty(grp, "m_pGameRules.m_iPlayerIDsInControl", null);
-                    boolean isDraftStarted = iPlayerIDsInControl.compareTo(Long.valueOf(0)) != 0;
-                    if (isDraftStarted) {
-                        Entry draftStartEntry = new Entry(time);
-                        draftStartEntry.type = "draft_start";
-                        output(draftStartEntry);
-                        isDraftStartTimeProcessed = true;
-                    }
-                }
-
-                // Picks and ban are not in order due to draft change rules changes between
-                // patches
-                // Need to listen for the picks and ban to change
-                int[] draftHeroes = new int[24];
-                draftHeroes[0] = getEntityProperty(grp, "m_pGameRules.m_BannedHeroes.0000", null);
-                draftHeroes[1] = getEntityProperty(grp, "m_pGameRules.m_BannedHeroes.0001", null);
-                draftHeroes[2] = getEntityProperty(grp, "m_pGameRules.m_BannedHeroes.0002", null);
-                draftHeroes[3] = getEntityProperty(grp, "m_pGameRules.m_BannedHeroes.0003", null);
-                draftHeroes[4] = getEntityProperty(grp, "m_pGameRules.m_BannedHeroes.0004", null);
-                draftHeroes[5] = getEntityProperty(grp, "m_pGameRules.m_BannedHeroes.0005", null);
-                draftHeroes[6] = getEntityProperty(grp, "m_pGameRules.m_BannedHeroes.0006", null);
-                draftHeroes[7] = getEntityProperty(grp, "m_pGameRules.m_BannedHeroes.0007", null);
-                draftHeroes[8] = getEntityProperty(grp, "m_pGameRules.m_BannedHeroes.0008", null);
-                draftHeroes[9] = getEntityProperty(grp, "m_pGameRules.m_BannedHeroes.0009", null);
-                // Apparently Drafts go to 6 bans now, but have returns of null
-                draftHeroes[10] = getEntityProperty(grp, "m_pGameRules.m_BannedHeroes.0010", null) == null ? 0
-                        : getEntityProperty(grp, "m_pGameRules.m_BannedHeroes.0010", null);
-                draftHeroes[11] = getEntityProperty(grp, "m_pGameRules.m_BannedHeroes.0011", null) == null ? 0
-                        : getEntityProperty(grp, "m_pGameRules.m_BannedHeroes.0011", null);
-                draftHeroes[12] = getEntityProperty(grp, "m_pGameRules.m_BannedHeroes.0012", null) == null ? 0
-                        : getEntityProperty(grp, "m_pGameRules.m_BannedHeroes.0012", null);
-                draftHeroes[13] = getEntityProperty(grp, "m_pGameRules.m_BannedHeroes.0013", null) == null ? 0
-                        : getEntityProperty(grp, "m_pGameRules.m_BannedHeroes.0013", null);
-                draftHeroes[14] = getEntityProperty(grp, "m_pGameRules.m_SelectedHeroes.0000", null);
-                draftHeroes[15] = getEntityProperty(grp, "m_pGameRules.m_SelectedHeroes.0001", null);
-                draftHeroes[16] = getEntityProperty(grp, "m_pGameRules.m_SelectedHeroes.0002", null);
-                draftHeroes[17] = getEntityProperty(grp, "m_pGameRules.m_SelectedHeroes.0003", null);
-                draftHeroes[18] = getEntityProperty(grp, "m_pGameRules.m_SelectedHeroes.0004", null);
-                draftHeroes[19] = getEntityProperty(grp, "m_pGameRules.m_SelectedHeroes.0005", null);
-                draftHeroes[20] = getEntityProperty(grp, "m_pGameRules.m_SelectedHeroes.0006", null);
-                draftHeroes[21] = getEntityProperty(grp, "m_pGameRules.m_SelectedHeroes.0007", null);
-                draftHeroes[22] = getEntityProperty(grp, "m_pGameRules.m_SelectedHeroes.0008", null);
-                draftHeroes[23] = getEntityProperty(grp, "m_pGameRules.m_SelectedHeroes.0009", null);
-                // Once a pick or ban happens grab the time and extra time remaining for both
-                // teams
-                for (int i = 0; i < draftHeroes.length; i++) {
-                    if (draftHeroes[i] > 0 && draftOrderProcessed[i] == false) {
-                        // used to check for new bans and picks
-                        draftOrderProcessed[i] = true;
-                        Entry draftTimingsEntry = new Entry(time);
-                        draftTimingsEntry.type = "draft_timings";
-                        draftTimingsEntry.draft_order = order;
-                        order = order + 1;
-                        draftTimingsEntry.pick = i >= 14;
-                        draftTimingsEntry.hero_id = draftHeroes[i] / 2;
-                        draftTimingsEntry.draft_active_team = getEntityProperty(grp, "m_pGameRules.m_iActiveTeam",
-                                null);
-                        draftTimingsEntry.draft_extime0 = Math
-                                .round((float) getEntityProperty(grp, "m_pGameRules.m_fExtraTimeRemaining.0000", null));
-                        draftTimingsEntry.draft_extime1 = Math
-                                .round((float) getEntityProperty(grp, "m_pGameRules.m_fExtraTimeRemaining.0001", null));
-                        output(draftTimingsEntry);
-                    }
-                }
+                handleDraftStage(ctx, gameRulesProxy, draftStage);
             }
-            // initialize nextInterval value
+            
+            // Initialize nextInterval value
             if (nextInterval == 0) {
                 nextInterval = time;
             }
         }
-        if (pr != null) {
+        
+        if (playerResource != null) {
             // Radiant coach shows up in vecPlayerTeamData as position 5
             // all the remaining dire entities are offset by 1 and so we miss reading the
             // last one and don't get data for the first dire player
             // coaches appear to be on team 1, radiant is 2 and dire is 3?
-            // construct an array of valid indices to get vecPlayerTeamData from
-            if (!init) {
-                int added = 0;
-                int i = 0;
-                boolean hasWaitingForDraftPlayers = false;
-                ArrayList<Entry> playerEntries = new ArrayList<Entry>();
-                // according to @Decoud Valve seems to have fixed this issue and players should
-                // be in first 10 slots again
-                // sanity check of i to prevent infinite loop when <10 players?
-                while (added < numPlayers && i < 30) {
-                    try {
-                        // check each m_vecPlayerData to ensure the player's team is radiant or dire
-                        int playerTeam = getEntityProperty(pr, "m_vecPlayerData.%i.m_iPlayerTeam", i);
-                        int teamSlot = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_iTeamSlot", i);
-                        Long steamid = getEntityProperty(pr, "m_vecPlayerData.%i.m_iPlayerSteamID", i);
-                        // System.err.format("%s %s %s: %s\n", i, playerTeam, teamSlot, steamid);
-                        if (playerTeam == 2 || playerTeam == 3) {
-                            // output the player_slot based on team and teamslot
-                            Entry entry = new Entry(time);
-                            entry.type = "player_slot";
-                            entry.key = String.valueOf(added);
-                            entry.value = (playerTeam == 2 ? 0 : 128) + teamSlot;
-                            playerEntries.add(entry);
-                            // add it to validIndices, add 1 to added
-                            validIndices[added] = i;
-                            added += 1;
-                            slot_to_playerslot.put(added, entry.value);
-                            steamid_to_playerslot.put(steamid, entry.value);
-                        } else if (playerTeam == 14) {
-                            // 7.33 player waiting to be drafted onto a team
-                            hasWaitingForDraftPlayers = true;
-                            break;
-                        }
-                    } catch (Exception e) {
-                        // swallow the exception when an unexpected number of players (!=10)
-                        // System.err.println(e);
-                    }
-
-                    i += 1;
-                }
-                if (!hasWaitingForDraftPlayers) {
-                    for (int j = 0; j < playerEntries.size(); j++) {
-                        output(playerEntries.get(j));
-                    }
-                    init = true;
-                }
+            // Construct an array of valid indices to get vecPlayerTeamData from
+            if (!initialized) {
+                initializePlayers(ctx, playerResource);
             }
 
-            if (init && !postGame && time >= nextInterval) {
-                // System.err.println(pr);
-                for (int i = 0; i < numPlayers; i++) {
-                    Integer hero = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_nSelectedHeroID", validIndices[i]);
-                    int handle = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_hSelectedHero", validIndices[i]);
-                    int playerTeam = getEntityProperty(pr, "m_vecPlayerData.%i.m_iPlayerTeam", validIndices[i]);
-                    int teamSlot = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_iTeamSlot", validIndices[i]);
-
-                    // facet/variant format and key location changed in 7.39, leaving this as a fallback
-                    Integer variant = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_nSelectedHeroVariant", validIndices[i]);
-                    Integer facet_hero_id = null;
-
-                    // 2 is radiant, 3 is dire, 1 is other?
-                    Entity dataTeam = playerTeam == 2 ? rData : dData;
-
-                    Entry entry = new Entry(time);
-                    entry.type = "interval";
-                    entry.slot = i;
-                    entry.repicked = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_bHasRepicked", validIndices[i]);
-                    entry.randomed = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_bHasRandomed", validIndices[i]);
-                    entry.pred_vict = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_bHasPredictedVictory",
-                            validIndices[i]);
-                    entry.firstblood_claimed = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_iFirstBloodClaimed",
-                            validIndices[i]);
-                    entry.teamfight_participation = getEntityProperty(pr,
-                            "m_vecPlayerTeamData.%i.m_flTeamFightParticipation", validIndices[i]);
-                    ;
-                    entry.level = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_iLevel", validIndices[i]);
-                    entry.kills = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_iKills", validIndices[i]);
-                    entry.deaths = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_iDeaths", validIndices[i]);
-                    entry.assists = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_iAssists", validIndices[i]);
-                    entry.denies = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iDenyCount", teamSlot);
-                    entry.obs_placed = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iObserverWardsPlaced", teamSlot);
-                    entry.sen_placed = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iSentryWardsPlaced", teamSlot);
-                    entry.creeps_stacked = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iCreepsStacked", teamSlot);
-                    entry.camps_stacked = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iCampsStacked", teamSlot);
-                    entry.rune_pickups = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iRunePickups", teamSlot);
-                    entry.towers_killed = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iTowerKills", teamSlot);
-                    entry.roshans_killed = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iRoshanKills", teamSlot);
-                    entry.observers_placed = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iObserverWardsPlaced",
-                            teamSlot);
-                    entry.networth = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iNetWorth", teamSlot);
-                    entry.stage = draftStage;
-
-                    if (teamSlot >= 0) {
-                        entry.gold = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iTotalEarnedGold", teamSlot);
-                        entry.lh = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iLastHitCount", teamSlot);
-                        entry.xp = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iTotalEarnedXP", teamSlot);
-                        entry.stuns = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_fStuns", teamSlot);
-                    }
-
-                    // TODO: gem, rapier time?
-                    // need to dump inventory items for each player and possibly keep track of item
-                    // entity handles
-
-                    // get the player's hero entity
-                    Entity e = ctx.getProcessor(Entities.class).getByHandle(handle);
-                    // get the hero's coordinates
-                    if (e != null) {
-                        // System.err.println(e);
-                        //CBodyComponent.m_cell[XY] * 128 + CBodyComponent.m_vec[XY]
-                        Integer cx = getEntityProperty(e, "CBodyComponent.m_cellX", null);
-                        Integer cy = getEntityProperty(e, "CBodyComponent.m_cellY", null);
-
-                        Float vx = getEntityProperty(e, "CBodyComponent.m_vecX", null);
-                        Float vy = getEntityProperty(e, "CBodyComponent.m_vecY", null);
-                        
-                        if (cx != null && cy != null) {
-                            entry.x = getPreciseLocation(cx,vx);
-                            entry.y = getPreciseLocation(cy,vy);
-                        }
-
-                        // post-7.39 format for facets is a 128bit number, where last 32 bits represent the variant
-                        // and the first 32 bits represent the hero id, which acts as the source for the facet
-                        // (same as hero_id in all cases, except ability draft)
-                        // 0xHHHH00000000VVVV
-                        Long facet_key = getEntityProperty(e, "m_iHeroFacetKey", null);
-                        if (facet_key != null) {
-                            facet_hero_id = (int) (facet_key >> (4 * 8));
-                            variant = (int) (facet_key & 0xFF);
-                        }
-
-                        // System.err.format("%s, %s\n", entry.x, entry.y);
-                        // get the hero's entity name, ex: CDOTA_Hero_Zuus
-                        entry.unit = e.getDtClass().getDtName();
-                        entry.hero_id = hero;
-                        entry.variant = variant;
-                        entry.facet_hero_id = facet_hero_id;
-                        entry.life_state = getEntityProperty(e, "m_lifeState", null);
-                        // check if hero has been assigned to entity
-                        if (hero > 0) {
-                            // get the hero's entity name, ex: CDOTA_Hero_Zuus
-                            String unit = e.getDtClass().getDtName();
-                            // grab the end of the name, lowercase it
-                            String ending = unit.substring("CDOTA_Unit_Hero_".length());
-                            // valve is bad at consistency and the combat log name could involve replacing
-                            // camelCase with _ or not!
-                            // double map it so we can look up both cases
-                            String combatLogName = "npc_dota_hero_" + ending.toLowerCase();
-                            // don't include final underscore here since the first letter is always
-                            // capitalized and will be converted to underscore
-                            String combatLogName2 = "npc_dota_hero" + ending.replaceAll("([A-Z])", "_$1").toLowerCase();
-                            // System.err.format("%s, %s, %s\n", unit, combatLogName, combatLogName2);
-                            // populate for combat log mapping
-                            name_to_slot.put(combatLogName, entry.slot);
-                            name_to_slot.put(combatLogName2, entry.slot);
-
-                            abilities = getHeroAbilities(ctx, e);
-                            for (Ability ability : abilities) {
-                                // Only push ability updates when the level changes
-                                if (abilities_tracking.get(combatLogName + ability.id) != ability.abilityLevel
-                                        || abilities_tracking.isEmpty()) {
-                                    Entry abilitiesEntry = new Entry(time);
-                                    abilitiesEntry.type = "DOTA_ABILITY_LEVEL";
-                                    abilitiesEntry.targetname = combatLogName;
-                                    abilitiesEntry.valuename = ability.id;
-                                    abilitiesEntry.abilitylevel = ability.abilityLevel;
-                                    // We use the combatLogName & the ability id as some ability IDs are the same
-                                    abilities_tracking.put(combatLogName + ability.id, ability.abilityLevel);
-                                    output(abilitiesEntry);
-                                }
-                            }
-
-                            entry.hero_inventory = getHeroInventory(ctx, e);
-                            if (time - gameStartTime - 1 == 0) {
-                                for (Item item : entry.hero_inventory) {
-                                    Entry startingItems = new Entry(time);
-                                    startingItems.type = "STARTING_ITEM";
-                                    startingItems.targetname = combatLogName;
-                                    startingItems.valuename = item.id;
-                                    startingItems.slot = entry.slot;
-                                    startingItems.value = (entry.slot < 5 ? 0 : 123) + entry.slot;
-                                    startingItems.itemslot = item.slot;
-                                    startingItems.charges = item.num_charges;
-                                    startingItems.secondary_charges = item.num_secondary_charges;
-                                    output(startingItems);
-                                }
-                            }
-                            if (!isPlayerStartingItemsWritten.get(entry.slot) && entry.hero_inventory != null) {
-                                // Making something similar to DOTA_COMBATLOG_PURCHASE for each item in the
-                                // beginning of the game
-                                isPlayerStartingItemsWritten.set(entry.slot, true);
-                                for (Item item : entry.hero_inventory) {
-                                    Entry startingItemsEntry = new Entry(time);
-                                    startingItemsEntry.type = "DOTA_COMBATLOG_PURCHASE";
-                                    startingItemsEntry.slot = entry.slot;
-                                    startingItemsEntry.value = (entry.slot < 5 ? 0 : 123) + entry.slot;
-                                    startingItemsEntry.valuename = item.id;
-                                    startingItemsEntry.targetname = combatLogName;
-                                    startingItemsEntry.charges = item.num_charges;
-                                    output(startingItemsEntry);
-                                }
-                            }
-                        }
-                    }
-                    output(entry);
-                }
-                nextInterval += INTERVAL;
+            if (initialized && !postGame && time >= nextInterval) {
+                processIntervalUpdate(ctx, playerResource, dataRadiant, dataDire, draftStage);
+                nextInterval += INTERVAL_SECONDS;
             }
 
             // When the game is over, get dota plus levels
             if (postGame && !isDotaPlusProcessed) {
-                for (int i = 0; i < numPlayers; i++) {
-                    int xp = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_unSelectedHeroBadgeXP", i) == null ? 0
-                            : getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_unSelectedHeroBadgeXP", i);
-                    Long steamid = getEntityProperty(pr, "m_vecPlayerData.%i.m_iPlayerSteamID", i);
-                    if (steamid_to_playerslot.containsKey(steamid)) {
-                        int playerslot = steamid_to_playerslot.get(steamid);
-                        dotaplusxpMap.put(playerslot, xp);
-                    }
-                }
-                isDotaPlusProcessed = true;
+                processDotaPlusLevels(ctx, playerResource);
             }
         }
     }
+    
+    private void handleDraftStage(Context ctx, Entity gameRulesProxy, Integer draftStage) {
+        // Determine the time the draftings start
+        if (!isDraftStartTimeProcessed) {
+            Long playerIdsInControl = getEntityProperty(gameRulesProxy, PROPERTY_PLAYER_IDS_IN_CONTROL, null);
+            boolean isDraftStarted = playerIdsInControl != null && playerIdsInControl.compareTo(0L) != 0;
+            if (isDraftStarted) {
+                Entry draftStartEntry = new Entry(time);
+                draftStartEntry.type = "draft_start";
+                output(draftStartEntry);
+                isDraftStartTimeProcessed = true;
+            }
+        }
 
-    private List<Item> getHeroInventory(Context ctx, Entity eHero) {
+        // Picks and ban are not in order due to draft change rules changes between patches
+        // Need to listen for the picks and ban to change
+        int[] draftHeroes = loadDraftHeroes(gameRulesProxy);
+        
+        // Once a pick or ban happens grab the time and extra time remaining for both teams
+        for (int i = 0; i < draftHeroes.length; i++) {
+            if (draftHeroes[i] > 0 && !draftOrderProcessed[i]) {
+                draftOrderProcessed[i] = true;
+                Entry draftTimingsEntry = new Entry(time);
+                draftTimingsEntry.type = "draft_timings";
+                draftTimingsEntry.draft_order = draftOrder;
+                draftOrder++;
+                draftTimingsEntry.pick = i >= 14; // First 14 are bans, rest are picks
+                draftTimingsEntry.hero_id = draftHeroes[i] / 2;
+                draftTimingsEntry.draft_active_team = getEntityProperty(gameRulesProxy, PROPERTY_ACTIVE_TEAM, null);
+                draftTimingsEntry.draft_extime0 = Math.round((float) getEntityProperty(gameRulesProxy, 
+                    PROPERTY_EXTRA_TIME_REMAINING + ".0000", null));
+                draftTimingsEntry.draft_extime1 = Math.round((float) getEntityProperty(gameRulesProxy, 
+                    PROPERTY_EXTRA_TIME_REMAINING + ".0001", null));
+                output(draftTimingsEntry);
+            }
+        }
+    }
+    
+    private int[] loadDraftHeroes(Entity gameRulesProxy) {
+        int[] draftHeroes = new int[DRAFT_HEROES_ARRAY_SIZE];
+        
+        // Load banned heroes (0-13)
+        for (int i = 0; i < 14; i++) {
+            String index = String.format("%04d", i);
+            Integer hero = getEntityProperty(gameRulesProxy, PROPERTY_BANNED_HEROES + "." + index, null);
+            draftHeroes[i] = (hero == null) ? 0 : hero;
+        }
+        
+        // Load selected heroes (14-23)
+        for (int i = 0; i < 10; i++) {
+            String index = String.format("%04d", i);
+            draftHeroes[14 + i] = getEntityProperty(gameRulesProxy, PROPERTY_SELECTED_HEROES + "." + index, null);
+        }
+        
+        return draftHeroes;
+    }
+    
+    private void initializePlayers(Context ctx, Entity playerResource) {
+        int added = 0;
+        int index = 0;
+        boolean hasWaitingForDraftPlayers = false;
+        List<Entry> playerEntries = new ArrayList<>();
+        
+        // According to @Decoud Valve seems to have fixed this issue and players should
+        // be in first 10 slots again. Sanity check of index to prevent infinite loop when <10 players
+        while (added < NUM_PLAYERS && index < MAX_PLAYER_SEARCH_INDEX) {
+            try {
+                int playerTeam = getEntityProperty(playerResource, "m_vecPlayerData.%i.m_iPlayerTeam", index);
+                int teamSlot = getEntityProperty(playerResource, "m_vecPlayerTeamData.%i.m_iTeamSlot", index);
+                Long steamId = getEntityProperty(playerResource, "m_vecPlayerData.%i.m_iPlayerSteamID", index);
+                
+                if (playerTeam == RADIANT_TEAM_ID || playerTeam == DIRE_TEAM_ID) {
+                    Entry entry = new Entry(time);
+                    entry.type = "player_slot";
+                    entry.key = String.valueOf(added);
+                    entry.value = (playerTeam == RADIANT_TEAM_ID ? 0 : PLAYER_SLOT_OFFSET) + teamSlot;
+                    playerEntries.add(entry);
+                    validIndices[added] = index;
+                    added++;
+                    slotToPlayerSlot.put(added, entry.value);
+                    steamIdToPlayerSlot.put(steamId, entry.value);
+                } else if (playerTeam == WAITING_FOR_DRAFT_TEAM_ID) {
+                    // 7.33 player waiting to be drafted onto a team
+                    hasWaitingForDraftPlayers = true;
+                    break;
+                }
+            } catch (Exception e) {
+                // Swallow the exception when an unexpected number of players (!=10)
+            }
+            index++;
+        }
+        
+        if (!hasWaitingForDraftPlayers) {
+            for (Entry entry : playerEntries) {
+                output(entry);
+            }
+            initialized = true;
+        }
+    }
+    
+    private void processIntervalUpdate(Context ctx, Entity playerResource, Entity dataRadiant, Entity dataDire, Integer draftStage) {
+        for (int i = 0; i < NUM_PLAYERS; i++) {
+            Integer hero = getEntityProperty(playerResource, "m_vecPlayerTeamData.%i.m_nSelectedHeroID", validIndices[i]);
+            int handle = getEntityProperty(playerResource, "m_vecPlayerTeamData.%i.m_hSelectedHero", validIndices[i]);
+            int playerTeam = getEntityProperty(playerResource, "m_vecPlayerData.%i.m_iPlayerTeam", validIndices[i]);
+            int teamSlot = getEntityProperty(playerResource, "m_vecPlayerTeamData.%i.m_iTeamSlot", validIndices[i]);
+
+            // Facet/variant format and key location changed in 7.39, leaving this as a fallback
+            Integer variant = getEntityProperty(playerResource, "m_vecPlayerTeamData.%i.m_nSelectedHeroVariant", validIndices[i]);
+            Integer facetHeroId = null;
+
+            Entity dataTeam = (playerTeam == RADIANT_TEAM_ID) ? dataRadiant : dataDire;
+
+            Entry entry = new Entry(time);
+            entry.type = "interval";
+            entry.slot = i;
+            entry.repicked = getEntityProperty(playerResource, "m_vecPlayerTeamData.%i.m_bHasRepicked", validIndices[i]);
+            entry.randomed = getEntityProperty(playerResource, "m_vecPlayerTeamData.%i.m_bHasRandomed", validIndices[i]);
+            entry.pred_vict = getEntityProperty(playerResource, "m_vecPlayerTeamData.%i.m_bHasPredictedVictory", validIndices[i]);
+            entry.firstblood_claimed = getEntityProperty(playerResource, "m_vecPlayerTeamData.%i.m_iFirstBloodClaimed", validIndices[i]);
+            entry.teamfight_participation = getEntityProperty(playerResource, "m_vecPlayerTeamData.%i.m_flTeamFightParticipation", validIndices[i]);
+            entry.level = getEntityProperty(playerResource, "m_vecPlayerTeamData.%i.m_iLevel", validIndices[i]);
+            entry.kills = getEntityProperty(playerResource, "m_vecPlayerTeamData.%i.m_iKills", validIndices[i]);
+            entry.deaths = getEntityProperty(playerResource, "m_vecPlayerTeamData.%i.m_iDeaths", validIndices[i]);
+            entry.assists = getEntityProperty(playerResource, "m_vecPlayerTeamData.%i.m_iAssists", validIndices[i]);
+            entry.denies = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iDenyCount", teamSlot);
+            entry.obs_placed = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iObserverWardsPlaced", teamSlot);
+            entry.sen_placed = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iSentryWardsPlaced", teamSlot);
+            entry.creeps_stacked = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iCreepsStacked", teamSlot);
+            entry.camps_stacked = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iCampsStacked", teamSlot);
+            entry.rune_pickups = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iRunePickups", teamSlot);
+            entry.towers_killed = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iTowerKills", teamSlot);
+            entry.roshans_killed = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iRoshanKills", teamSlot);
+            entry.observers_placed = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iObserverWardsPlaced", teamSlot);
+            entry.networth = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iNetWorth", teamSlot);
+            entry.stage = draftStage;
+
+            if (teamSlot >= 0) {
+                entry.gold = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iTotalEarnedGold", teamSlot);
+                entry.lh = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iLastHitCount", teamSlot);
+                entry.xp = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iTotalEarnedXP", teamSlot);
+                entry.stuns = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_fStuns", teamSlot);
+            }
+
+            // Get the player's hero entity
+            Entity heroEntity = ctx.getProcessor(Entities.class).getByHandle(handle);
+            if (heroEntity != null) {
+                processHeroEntity(ctx, heroEntity, entry, hero, variant, facetHeroId);
+            }
+            
+            output(entry);
+        }
+    }
+    
+    private void processHeroEntity(Context ctx, Entity heroEntity, Entry entry, Integer hero, Integer variant, Integer facetHeroId) {
+        // Get the hero's coordinates
+        Integer cellX = getEntityProperty(heroEntity, PROPERTY_CELL_X, null);
+        Integer cellY = getEntityProperty(heroEntity, PROPERTY_CELL_Y, null);
+        Float vecX = getEntityProperty(heroEntity, PROPERTY_VEC_X, null);
+        Float vecY = getEntityProperty(heroEntity, PROPERTY_VEC_Y, null);
+        
+        if (cellX != null && cellY != null) {
+            entry.x = getPreciseLocation(cellX, vecX);
+            entry.y = getPreciseLocation(cellY, vecY);
+        }
+
+        // Post-7.39 format for facets is a 128bit number, where last 32 bits represent the variant
+        // and the first 32 bits represent the hero id, which acts as the source for the facet
+        // (same as hero_id in all cases, except ability draft)
+        // 0xHHHH00000000VVVV
+        Long facetKey = getEntityProperty(heroEntity, PROPERTY_HERO_FACET_KEY, null);
+        if (facetKey != null) {
+            facetHeroId = (int) (facetKey >> FACET_KEY_HERO_ID_SHIFT);
+            variant = (int) (facetKey & FACET_KEY_VARIANT_MASK);
+        }
+
+        entry.unit = heroEntity.getDtClass().getDtName();
+        entry.hero_id = hero;
+        entry.variant = variant;
+        entry.facet_hero_id = facetHeroId;
+        entry.life_state = getEntityProperty(heroEntity, PROPERTY_LIFE_STATE, null);
+        
+        // Check if hero has been assigned to entity
+        if (hero != null && hero > 0) {
+            String unit = heroEntity.getDtClass().getDtName();
+            String ending = unit.substring(ENTITY_PREFIX_HERO.length());
+            // Valve is inconsistent with combat log names - could involve replacing camelCase with _ or not
+            // Double map it so we can look up both cases
+            String combatLogName = ENTITY_PREFIX_COMBAT_LOG_HERO + ending.toLowerCase();
+            String combatLogName2 = "npc_dota_hero" + ending.replaceAll("([A-Z])", "_$1").toLowerCase();
+            
+            // Populate for combat log mapping
+            nameToSlot.put(combatLogName, entry.slot);
+            nameToSlot.put(combatLogName2, entry.slot);
+
+            abilities = getHeroAbilities(ctx, heroEntity);
+            for (Ability ability : abilities) {
+                // Only push ability updates when the level changes
+                String abilityKey = combatLogName + ability.id;
+                Integer currentLevel = abilitiesTracking.get(abilityKey);
+                if (currentLevel == null || !currentLevel.equals(ability.abilityLevel)) {
+                    Entry abilitiesEntry = new Entry(time);
+                    abilitiesEntry.type = "DOTA_ABILITY_LEVEL";
+                    abilitiesEntry.targetname = combatLogName;
+                    abilitiesEntry.valuename = ability.id;
+                    abilitiesEntry.abilitylevel = ability.abilityLevel;
+                    // We use the combatLogName & the ability id as some ability IDs are the same
+                    abilitiesTracking.put(abilityKey, ability.abilityLevel);
+                    output(abilitiesEntry);
+                }
+            }
+
+            entry.hero_inventory = getHeroInventory(ctx, heroEntity);
+            processStartingItems(entry, combatLogName);
+        }
+    }
+    
+    private void processStartingItems(Entry entry, String combatLogName) {
+        if (time - gameStartTime - 1 == 0 && entry.hero_inventory != null) {
+            for (Item item : entry.hero_inventory) {
+                Entry startingItems = new Entry(time);
+                startingItems.type = "STARTING_ITEM";
+                startingItems.targetname = combatLogName;
+                startingItems.valuename = item.id;
+                startingItems.slot = entry.slot;
+                startingItems.value = (entry.slot < 5 ? 0 : PLAYER_SLOT_OFFSET) + entry.slot;
+                startingItems.itemslot = item.slot;
+                startingItems.charges = item.num_charges;
+                startingItems.secondary_charges = item.num_secondary_charges;
+                output(startingItems);
+            }
+        }
+        
+        if (!isPlayerStartingItemsWritten.get(entry.slot) && entry.hero_inventory != null) {
+            // Making something similar to DOTA_COMBATLOG_PURCHASE for each item in the beginning of the game
+            isPlayerStartingItemsWritten.set(entry.slot, true);
+            for (Item item : entry.hero_inventory) {
+                Entry startingItemsEntry = new Entry(time);
+                startingItemsEntry.type = "DOTA_COMBATLOG_PURCHASE";
+                startingItemsEntry.slot = entry.slot;
+                startingItemsEntry.value = (entry.slot < 5 ? 0 : PLAYER_SLOT_OFFSET) + entry.slot;
+                startingItemsEntry.valuename = item.id;
+                startingItemsEntry.targetname = combatLogName;
+                startingItemsEntry.charges = item.num_charges;
+                output(startingItemsEntry);
+            }
+        }
+    }
+    
+    private void processDotaPlusLevels(Context ctx, Entity playerResource) {
+        for (int i = 0; i < NUM_PLAYERS; i++) {
+            Integer xp = getEntityProperty(playerResource, "m_vecPlayerTeamData.%i.m_unSelectedHeroBadgeXP", i);
+            if (xp == null) {
+                xp = 0;
+            }
+            Long steamId = getEntityProperty(playerResource, "m_vecPlayerData.%i.m_iPlayerSteamID", i);
+            if (steamId != null && steamIdToPlayerSlot.containsKey(steamId)) {
+                int playerSlot = steamIdToPlayerSlot.get(steamId);
+                dotaPlusXpMap.put(playerSlot, xp);
+            }
+        }
+        isDotaPlusProcessed = true;
+    }
+
+    private List<Item> getHeroInventory(Context ctx, Entity heroEntity) {
         List<Item> inventoryList = new ArrayList<>(6);
 
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < MAX_INVENTORY_SLOTS; i++) {
             try {
-                Item item = getHeroItem(ctx, eHero, i);
+                Item item = getHeroItem(ctx, heroEntity, i);
                 if (item != null) {
                     inventoryList.add(item);
                 }
             } catch (Exception e) {
-                // System.err.println(e);
+                // Silently skip invalid item slots
             }
         }
 
         return inventoryList;
     }
 
-    private List<Ability> getHeroAbilities(Context ctx, Entity eHero) {
-        List<Ability> abilityList = new ArrayList<>(32);
-        for (int i = 0; i < 32; i++) {
+    private List<Ability> getHeroAbilities(Context ctx, Entity heroEntity) {
+        List<Ability> abilityList = new ArrayList<>(MAX_ABILITIES);
+        for (int i = 0; i < MAX_ABILITIES; i++) {
             try {
-                Ability ability = getHeroAbilities(ctx, eHero, i);
+                Ability ability = getHeroAbility(ctx, heroEntity, i);
                 if (ability != null) {
                     abilityList.add(ability);
                 }
             } catch (Exception e) {
-                // System.err.println(e);
+                // Silently skip invalid ability slots
             }
         }
         return abilityList;
@@ -994,25 +1100,27 @@ public class Parse {
     /**
      * Uses "EntityNames" string table and Entities processor
      * 
-     * @param ctx   Context
-     * @param eHero Hero entity
-     * @param idx   0-5 - inventory, 6-8 - backpack, 9-16 - stash
-     * @return {@code null} - empty slot. Throws @{@link UnknownItemFoundException}
+     * @param ctx        Context
+     * @param heroEntity Hero entity
+     * @param idx        0-5 - inventory, 6-8 - backpack, 9-16 - stash
+     * @return {@code null} - empty slot. Throws {@link UnknownItemFoundException}
      *         if item information can't be extracted
      */
-    private Item getHeroItem(Context ctx, Entity eHero, int idx) throws UnknownItemFoundException {
-        StringTable stEntityNames = ctx.getProcessor(StringTables.class).forName("EntityNames");
+    private Item getHeroItem(Context ctx, Entity heroEntity, int idx) throws UnknownItemFoundException {
+        StringTable entityNamesTable = ctx.getProcessor(StringTables.class).forName(STRING_TABLE_ENTITY_NAMES);
         Entities entities = ctx.getProcessor(Entities.class);
 
-        Integer hItem = eHero.getProperty("m_hItems." + Util.arrayIdxToString(idx));
-        if (hItem == 0xFFFFFF) {
+        Integer itemHandle = heroEntity.getProperty(PROPERTY_ITEMS + "." + Util.arrayIdxToString(idx));
+        if (itemHandle == null || itemHandle == INVALID_HANDLE) {
             return null;
         }
-        Entity eItem = entities.getByHandle(hItem);
-        if (eItem == null) {
-            throw new UnknownItemFoundException(String.format("Can't find item by its handle (%d)", hItem));
+        
+        Entity itemEntity = entities.getByHandle(itemHandle);
+        if (itemEntity == null) {
+            throw new UnknownItemFoundException(String.format("Can't find item by its handle (%d)", itemHandle));
         }
-        String itemName = stEntityNames.getNameByIndex(eItem.getProperty("m_pEntity.m_nameStringableIndex"));
+        
+        String itemName = entityNamesTable.getNameByIndex(itemEntity.getProperty(PROPERTY_ENTITY_NAME_INDEX));
         if (itemName == null) {
             throw new UnknownItemFoundException("Can't get item name from EntityName string table");
         }
@@ -1020,11 +1128,11 @@ public class Parse {
         Item item = new Item();
         item.id = itemName;
         item.slot = idx;
-        int numCharges = eItem.getProperty("m_iCurrentCharges");
+        int numCharges = itemEntity.getProperty(PROPERTY_CURRENT_CHARGES);
         if (numCharges != 0) {
             item.num_charges = numCharges;
         }
-        int numSecondaryCharges = eItem.getProperty("m_iSecondaryCharges");
+        int numSecondaryCharges = itemEntity.getProperty(PROPERTY_SECONDARY_CHARGES);
         if (numSecondaryCharges != 0) {
             item.num_secondary_charges = numSecondaryCharges;
         }
@@ -1034,106 +1142,211 @@ public class Parse {
     /**
      * Uses "EntityNames" string table and Entities processor
      * 
-     * @param ctx   Context
-     * @param eHero Hero entity
-     * @param idx   0-31 = Hero abilities including talents and special event items
-     * @return {@code null} - empty slot. Throws @{@link UnknownItemFoundException}
-     *         if item information can't be extracted
+     * @param ctx        Context
+     * @param heroEntity Hero entity
+     * @param idx        0-31 = Hero abilities including talents and special event items
+     * @return {@code null} - empty slot. Throws {@link UnknownAbilityFoundException}
+     *         if ability information can't be extracted
      */
-    private Ability getHeroAbilities(Context ctx, Entity eHero, int idx) throws UnknownAbilityFoundException {
-        StringTable stEntityNames = ctx.getProcessor(StringTables.class).forName("EntityNames");
+    private Ability getHeroAbility(Context ctx, Entity heroEntity, int idx) throws UnknownAbilityFoundException {
+        StringTable entityNamesTable = ctx.getProcessor(StringTables.class).forName(STRING_TABLE_ENTITY_NAMES);
         Entities entities = ctx.getProcessor(Entities.class);
 
-        Integer hAbility;
-        if (eHero.hasProperty("m_hAbilities." + Util.arrayIdxToString(idx))) {
-            hAbility = eHero.getProperty("m_hAbilities." + Util.arrayIdxToString(idx));
-        } else if (eHero.hasProperty("m_vecAbilities." + Util.arrayIdxToString(idx))) {
-            hAbility = eHero.getProperty("m_vecAbilities." + Util.arrayIdxToString(idx));
+        Integer abilityHandle;
+        String arrayIndex = Util.arrayIdxToString(idx);
+        if (heroEntity.hasProperty(PROPERTY_ABILITIES + "." + arrayIndex)) {
+            abilityHandle = heroEntity.getProperty(PROPERTY_ABILITIES + "." + arrayIndex);
+        } else if (heroEntity.hasProperty(PROPERTY_ABILITIES_VEC + "." + arrayIndex)) {
+            abilityHandle = heroEntity.getProperty(PROPERTY_ABILITIES_VEC + "." + arrayIndex);
         } else {
-            hAbility = 0xFFFFFF;
+            abilityHandle = INVALID_HANDLE;
         }
         
-        if (hAbility == 0xFFFFFF) {
+        if (abilityHandle == null || abilityHandle == INVALID_HANDLE) {
             return null;
         }
         
-        Entity eAbility = entities.getByHandle(hAbility);
-        if (eAbility == null) {
-            throw new UnknownAbilityFoundException(String.format("Can't find ability by its handle (%d)", hAbility));
+        Entity abilityEntity = entities.getByHandle(abilityHandle);
+        if (abilityEntity == null) {
+            throw new UnknownAbilityFoundException(String.format("Can't find ability by its handle (%d)", abilityHandle));
         }
-        String abilityName = stEntityNames.getNameByIndex(eAbility.getProperty("m_pEntity.m_nameStringableIndex"));
+        
+        String abilityName = entityNamesTable.getNameByIndex(abilityEntity.getProperty(PROPERTY_ENTITY_NAME_INDEX));
         if (abilityName == null) {
             throw new UnknownAbilityFoundException("Can't get ability name from EntityName string table");
         }
 
         Ability ability = new Ability();
         ability.id = abilityName;
-        ability.abilityLevel = eAbility.getProperty("m_iLevel");
+        ability.abilityLevel = abilityEntity.getProperty(PROPERTY_ABILITY_LEVEL);
 
         return ability;
     }
 
-    public <T> T getEntityProperty(Entity e, String property, Integer idx) {
+    /**
+     * Gets a property value from an entity.
+     * 
+     * @param <T>      The type of the property value
+     * @param entity   The entity to get the property from
+     * @param property The property name (may contain %i placeholder for array index)
+     * @param idx      Optional array index to replace %i placeholder
+     * @return The property value or null if not found or on error
+     */
+    public <T> T getEntityProperty(Entity entity, String property, Integer idx) {
         try {
-            if (e == null) {
+            if (entity == null) {
                 return null;
             }
             if (idx != null) {
                 property = property.replace("%i", Util.arrayIdxToString(idx));
             }
-            FieldPath fp = e.getDtClass().getFieldPathForName(property);
-            if (fp == null) {
+            FieldPath fieldPath = entity.getDtClass().getFieldPathForName(property);
+            if (fieldPath == null) {
                 return null;
             }
-            return e.getPropertyForFieldPath(fp);
+            return entity.getPropertyForFieldPath(fieldPath);
         } catch (Exception ex) {
+            // Silently return null on error - entity properties may not exist in all game versions
             return null;
         }
     }
 
-    // @OnWardKilled
-    // public void onWardKilled(Context ctx, Entity e, String killerHeroName) {
-    //     Entry wardEntry = buildWardEntry(ctx, e);
-    //     wardEntry.attackername = killerHeroName;
-    //     output(wardEntry);
-    // }
+    // Ward tracking handlers (consolidated from Wards.java)
+    @OnEntityCreated
+    public void onWardCreated(Context ctx, Entity e) {
+        if (!isWard(e)) return;
+        
+        FieldPath lifeStatePath;
+        
+        clearWardCachedState(e);
+        ensureWardFieldPathForEntityInitialized(e);
+        if ((lifeStatePath = getWardFieldPathForEntity(e)) != null) {
+            processWardLifeStateChange(ctx, e, lifeStatePath);
+        }
+    }
+    
+    @OnEntityUpdated
+    public void onWardUpdated(Context ctx, Entity e, FieldPath[] fieldPaths, int num) {
+        if (!isWard(e)) return;
+        
+        FieldPath p;
+        if ((p = getWardFieldPathForEntity(e)) != null) {
+            for (int i = 0; i < num; i++) {
+                if (fieldPaths[i].equals(p)) {
+                    wardToProcess.add(new WardProcessEntityCommand(e, p));
+                    break;
+                }
+            }
+        }
+    }
+    
+    @OnEntityDeleted
+    public void onWardDeleted(Context ctx, Entity e) {
+        if (!isWard(e)) return;
+        clearWardCachedState(e);
+    }
+    
+    @OnTickEnd
+    public void onWardTickEnd(Context ctx, boolean synthetic) {
+        if (!synthetic) return;
+        
+        WardProcessEntityCommand cmd;
+        while ((cmd = wardToProcess.poll()) != null) {
+            processWardLifeStateChange(ctx, cmd.entity, cmd.fieldPath);
+        }
+    }
+    
+    private void onWardKilled(Context ctx, Entity e, String killerHeroName) {
+        Entry wardEntry = buildWardEntry(ctx, e);
+        wardEntry.attackername = killerHeroName;
+        output(wardEntry);
+    }
 
-    // @OnWardExpired
-    // @OnWardPlaced
-    // public void onWardExistenceChanged(Context ctx, Entity e) {
-    //     output(buildWardEntry(ctx, e));
-    // }
+    private void onWardExistenceChanged(Context ctx, Entity e) {
+        output(buildWardEntry(ctx, e));
+    }
 
-    private Entry buildWardEntry(Context ctx, Entity e) {
+    // Ward tracking helper methods (consolidated from Wards.java)
+    private FieldPath getWardFieldPathForEntity(Entity e) {
+        return wardLifeStatePaths.get(e.getDtClass().getClassId());
+    }
+
+    private void clearWardCachedState(Entity e) {
+        wardCurrentLifeState.remove(e.getIndex());
+    }
+    
+    private void ensureWardFieldPathForEntityInitialized(Entity e) {
+        Integer cid = e.getDtClass().getClassId();
+        if (!wardLifeStatePaths.containsKey(cid)) {
+            wardLifeStatePaths.put(cid, e.getDtClass().getFieldPathForName("m_lifeState"));
+        }
+    }
+    
+    private boolean isWard(Entity e) {
+        return WARDS_DT_CLASSES.contains(e.getDtClass().getDtName());
+    }
+    
+    private boolean isWardDeath(CombatLogEntry e) {
+        return e.getType().equals(DOTAUserMessages.DOTA_COMBATLOG_TYPES.DOTA_COMBATLOG_DEATH)
+                && WARDS_TARGET_NAMES.contains(e.getTargetName());
+    }
+    
+    private void processWardLifeStateChange(Context ctx, Entity e, FieldPath p) {
+        int oldState = wardCurrentLifeState.containsKey(e.getIndex()) ? wardCurrentLifeState.get(e.getIndex()) : 2;
+        int newState = e.getPropertyForFieldPath(p);
+        if (oldState != newState) {
+            switch(newState) {
+                case 0:
+                    onWardExistenceChanged(ctx, e);
+                    break;
+                case 1:
+                    String killer;
+                    if ((killer = wardKillersByWardClass.get(getWardTargetName(e.getDtClass().getDtName())).poll()) != null) {
+                        onWardKilled(ctx, e, killer);
+                    } else {
+                        onWardExistenceChanged(ctx, e);
+                    }
+                    break;
+            }
+        }
+        
+        wardCurrentLifeState.put(e.getIndex(), newState);
+    }
+    
+    private String getWardTargetName(String ward_dtclass_name) {
+        return WARDS_TARGET_NAME_BY_DT_CLASS.get(ward_dtclass_name);
+    }
+    
+    private Entry buildWardEntry(Context ctx, Entity wardEntity) {
         Entry entry = new Entry(time);
-        boolean isObserver = !e.getDtClass().getDtName().contains("TrueSight");
+        boolean isObserver = !wardEntity.getDtClass().getDtName().contains("TrueSight");
 
-        Integer cx = getEntityProperty(e, "CBodyComponent.m_cellX", null);
-        Integer cy = getEntityProperty(e, "CBodyComponent.m_cellY", null);
-        Integer cz = getEntityProperty(e, "CBodyComponent.m_cellZ", null);
+        Integer cellX = getEntityProperty(wardEntity, PROPERTY_CELL_X, null);
+        Integer cellY = getEntityProperty(wardEntity, PROPERTY_CELL_Y, null);
+        Integer cellZ = getEntityProperty(wardEntity, PROPERTY_CELL_Z, null);
 
-        Float vx = getEntityProperty(e, "CBodyComponent.m_vecX", null);
-        Float vy = getEntityProperty(e, "CBodyComponent.m_vecY", null);
-        Float vz = getEntityProperty(e, "CBodyComponent.m_vecZ", null);
+        Float vecX = getEntityProperty(wardEntity, PROPERTY_VEC_X, null);
+        Float vecY = getEntityProperty(wardEntity, PROPERTY_VEC_Y, null);
+        Float vecZ = getEntityProperty(wardEntity, PROPERTY_VEC_Z, null);
 
-        Integer life_state = getEntityProperty(e, "m_lifeState", null);
+        Integer lifeState = getEntityProperty(wardEntity, PROPERTY_LIFE_STATE, null);
 
-        if (cx != null && cy != null && cz != null) {
-            entry.x = getPreciseLocation(cx,vx);
-            entry.y = getPreciseLocation(cy,vy);
-            entry.z = getPreciseLocation(cz,vz);
+        if (cellX != null && cellY != null && cellZ != null) {
+            entry.x = getPreciseLocation(cellX, vecX);
+            entry.y = getPreciseLocation(cellY, vecY);
+            entry.z = getPreciseLocation(cellZ, vecZ);
         }
 
         entry.type = isObserver ? "obs" : "sen";
-        entry.entityleft = life_state == 1;
-        entry.ehandle = e.getHandle();
+        entry.entityleft = (lifeState != null && lifeState == LIFE_STATE_DEAD);
+        entry.ehandle = wardEntity.getHandle();
 
         if (entry.entityleft) {
             entry.type += "_left";
         }
 
-        Integer owner = getEntityProperty(e, "m_hOwnerEntity", null);
-        Entity ownerEntity = ctx.getProcessor(Entities.class).getByHandle(owner);
+        Integer ownerHandle = getEntityProperty(wardEntity, PROPERTY_OWNER_ENTITY, null);
+        Entity ownerEntity = ctx.getProcessor(Entities.class).getByHandle(ownerHandle);
         entry.slot = getPlayerSlotFromEntity(ctx, ownerEntity);
 
         return entry;
@@ -1331,7 +1544,7 @@ public class Parse {
                     }
                 }
                 if (!playerEntries.isEmpty()) {
-                    payload.playersJson = g.toJson(playerEntries);
+                    payload.playersJson = gson.toJson(playerEntries);
                     dotaMap.put("players", playerEntries);
                 }
                 
@@ -1352,7 +1565,7 @@ public class Parse {
                     }
                 }
                 if (!picksBansEntries.isEmpty()) {
-                    payload.picksBansJson = g.toJson(picksBansEntries);
+                    payload.picksBansJson = gson.toJson(picksBansEntries);
                     dotaMap.put("picks_bans", picksBansEntries);
                 }
                 
@@ -1366,7 +1579,7 @@ public class Parse {
         }
         
         rawInfo.put("raw_text", message.toString());
-        payload.rawFileInfoJson = g.toJson(rawInfo);
+        payload.rawFileInfoJson = gson.toJson(rawInfo);
         
         return payload;
     }
