@@ -16,3 +16,4 @@ dbt-venv/
 parsed_output_*/
 .DS_Store
 bin/
+.vscode/
