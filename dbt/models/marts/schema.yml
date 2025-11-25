@@ -182,3 +182,424 @@ models:
             type: string
             label: "获胜队伍名称列表"
 
+  - name: fct_player_performance
+    description: |
+      Fact table containing player performance metrics for each match.
+      Each row represents a player's performance in a single match with final stats and match outcome.
+    meta:
+      label: "选手表现事实表"
+    columns:
+      - name: match_id
+        description: Unique identifier for the match
+        tests:
+          - not_null
+        meta:
+          dimension:
+            type: string
+            label: "比赛ID"
+      - name: player_slot
+        description: Player slot (0-4 for Radiant, 128-132 for Dire)
+        tests:
+          - not_null
+        meta:
+          dimension:
+            type: number
+            label: "选手槽位"
+      - name: steam_id
+        description: Steam ID of the player
+        meta:
+          dimension:
+            type: number
+            label: "Steam ID"
+      - name: player_name
+        description: Name of the player
+        meta:
+          dimension:
+            type: string
+            label: "选手名称"
+      - name: hero_id
+        description: Numeric identifier for the hero played
+        tests:
+          - not_null
+        meta:
+          dimension:
+            type: number
+            label: "英雄ID"
+      - name: hero_chinese_name
+        description: Chinese name of the hero
+        meta:
+          dimension:
+            type: string
+            label: "英雄中文名"
+      - name: hero_name_english
+        description: English name of the hero
+        meta:
+          dimension:
+            type: string
+            label: "英雄英文名"
+      - name: team
+        description: Team ID (2 = Radiant, 3 = Dire)
+        tests:
+          - not_null
+        meta:
+          dimension:
+            type: number
+            label: "所属阵营编码"
+      - name: team_name
+        description: Display name for the team
+        meta:
+          dimension:
+            type: string
+            label: "队伍名称"
+      - name: winning_team
+        description: Team that won the match (2 = Radiant, 3 = Dire)
+        meta:
+          dimension:
+            type: number
+            label: "获胜阵营编码"
+      - name: winning_team_name
+        description: Display name for the winning team
+        meta:
+          dimension:
+            type: string
+            label: "获胜队伍名称"
+      - name: won
+        description: Boolean indicating whether this player won the match
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true, false]
+        meta:
+          dimension:
+            type: boolean
+            label: "是否获胜"
+      - name: is_fake_client
+        description: Whether this is a fake client/bot
+        meta:
+          dimension:
+            type: boolean
+            label: "是否为假客户端"
+      - name: final_level
+        description: Final hero level at end of match
+        meta:
+          dimension:
+            type: number
+            label: "最终等级"
+          metrics:
+            avg_final_level:
+              type: average
+              label: "平均最终等级"
+            max_final_level:
+              type: max
+              label: "最高最终等级"
+      - name: final_gold
+        description: Final gold at end of match
+        meta:
+          dimension:
+            type: number
+            label: "最终金币"
+          metrics:
+            avg_final_gold:
+              type: average
+              label: "平均最终金币"
+            max_final_gold:
+              type: max
+              label: "最高最终金币"
+      - name: last_hits
+        description: Total last hits (creep kills)
+        meta:
+          dimension:
+            type: number
+            label: "补刀数"
+          metrics:
+            total_last_hits:
+              type: sum
+              label: "补刀数总和"
+            avg_last_hits:
+              type: average
+              label: "平均补刀数"
+            max_last_hits:
+              type: max
+              label: "最高补刀数"
+      - name: total_xp
+        description: Total experience points earned
+        meta:
+          dimension:
+            type: number
+            label: "总经验值"
+          metrics:
+            sum_total_xp:
+              type: sum
+              label: "经验值总和"
+            avg_total_xp:
+              type: average
+              label: "平均经验值"
+      - name: kills
+        description: Number of kills
+        meta:
+          dimension:
+            type: number
+            label: "击杀数"
+          metrics:
+            total_kills:
+              type: sum
+              label: "击杀数总和"
+            avg_kills:
+              type: average
+              label: "平均击杀数"
+            max_kills:
+              type: max
+              label: "最高击杀数"
+      - name: deaths
+        description: Number of deaths
+        meta:
+          dimension:
+            type: number
+            label: "死亡数"
+          metrics:
+            total_deaths:
+              type: sum
+              label: "死亡数总和"
+            avg_deaths:
+              type: average
+              label: "平均死亡数"
+      - name: assists
+        description: Number of assists
+        meta:
+          dimension:
+            type: number
+            label: "助攻数"
+          metrics:
+            total_assists:
+              type: sum
+              label: "助攻数总和"
+            avg_assists:
+              type: average
+              label: "平均助攻数"
+            max_assists:
+              type: max
+              label: "最高助攻数"
+      - name: denies
+        description: Number of denies
+        meta:
+          dimension:
+            type: number
+            label: "反补数"
+          metrics:
+            total_denies:
+              type: sum
+              label: "反补数总和"
+            avg_denies:
+              type: average
+              label: "平均反补数"
+      - name: final_networth
+        description: Final net worth at end of match
+        meta:
+          dimension:
+            type: number
+            label: "最终经济值"
+          metrics:
+            avg_final_networth:
+              type: average
+              label: "平均最终经济值"
+            max_final_networth:
+              type: max
+              label: "最高最终经济值"
+      - name: kda_ratio
+        description: Kill/Death ratio (K/D ratio)
+        meta:
+          dimension:
+            type: number
+            label: "KDA比率"
+          metrics:
+            avg_kda_ratio:
+              type: average
+              label: "平均KDA比率"
+            max_kda_ratio:
+              type: max
+              label: "最高KDA比率"
+      - name: kill_participation
+        description: Total kills and assists (K+A)
+        meta:
+          dimension:
+            type: number
+            label: "击杀参与数"
+          metrics:
+            total_kill_participation:
+              type: sum
+              label: "击杀参与数总和"
+            avg_kill_participation:
+              type: average
+              label: "平均击杀参与数"
+      - name: kill_participation_ratio
+        description: (Kills + Assists) / Deaths ratio
+        meta:
+          dimension:
+            type: number
+            label: "击杀参与比率"
+          metrics:
+            avg_kill_participation_ratio:
+              type: average
+              label: "平均击杀参与比率"
+            max_kill_participation_ratio:
+              type: max
+              label: "最高击杀参与比率"
+      - name: total_stuns
+        description: Total stun duration inflicted
+        meta:
+          dimension:
+            type: number
+            label: "总眩晕时长"
+          metrics:
+            sum_total_stuns:
+              type: sum
+              label: "眩晕时长总和"
+            avg_total_stuns:
+              type: average
+              label: "平均眩晕时长"
+      - name: obs_placed
+        description: Number of observer wards placed
+        meta:
+          dimension:
+            type: number
+            label: "放置的侦查守卫数"
+          metrics:
+            total_obs_placed:
+              type: sum
+              label: "侦查守卫总数"
+            avg_obs_placed:
+              type: average
+              label: "平均侦查守卫数"
+      - name: sen_placed
+        description: Number of sentry wards placed
+        meta:
+          dimension:
+            type: number
+            label: "放置的岗哨守卫数"
+          metrics:
+            total_sen_placed:
+              type: sum
+              label: "岗哨守卫总数"
+            avg_sen_placed:
+              type: average
+              label: "平均岗哨守卫数"
+      - name: creeps_stacked
+        description: Number of creep camps stacked
+        meta:
+          dimension:
+            type: number
+            label: "拉野次数"
+          metrics:
+            total_creeps_stacked:
+              type: sum
+              label: "拉野总次数"
+            avg_creeps_stacked:
+              type: average
+              label: "平均拉野次数"
+      - name: camps_stacked
+        description: Number of camps stacked
+        meta:
+          dimension:
+            type: number
+            label: "堆叠的野怪营地数"
+          metrics:
+            total_camps_stacked:
+              type: sum
+              label: "堆叠营地总数"
+            avg_camps_stacked:
+              type: average
+              label: "平均堆叠营地数"
+      - name: rune_pickups
+        description: Number of runes picked up
+        meta:
+          dimension:
+            type: number
+            label: "拾取的符文数"
+          metrics:
+            total_rune_pickups:
+              type: sum
+              label: "符文拾取总数"
+            avg_rune_pickups:
+              type: average
+              label: "平均符文拾取数"
+      - name: towers_killed
+        description: Number of towers killed
+        meta:
+          dimension:
+            type: number
+            label: "摧毁的防御塔数"
+          metrics:
+            total_towers_killed:
+              type: sum
+              label: "摧毁防御塔总数"
+            avg_towers_killed:
+              type: average
+              label: "平均摧毁防御塔数"
+      - name: roshans_killed
+        description: Number of Roshans killed
+        meta:
+          dimension:
+            type: number
+            label: "击杀的肉山数"
+          metrics:
+            total_roshans_killed:
+              type: sum
+              label: "击杀肉山总数"
+            avg_roshans_killed:
+              type: average
+              label: "平均击杀肉山数"
+      - name: observers_placed
+        description: Number of observers placed (alternative metric)
+        meta:
+          dimension:
+            type: number
+            label: "放置的观察者数"
+          metrics:
+            total_observers_placed:
+              type: sum
+              label: "观察者总数"
+            avg_observers_placed:
+              type: average
+              label: "平均观察者数"
+      - name: firstblood_claimed
+        description: Whether the player claimed first blood (1 = yes, 0 = no)
+        meta:
+          dimension:
+            type: number
+            label: "是否获得一血"
+          metrics:
+            total_firstblood_claimed:
+              type: sum
+              label: "一血获得总数"
+      - name: teamfight_participation
+        description: Teamfight participation rate
+        meta:
+          dimension:
+            type: number
+            label: "团战参与率"
+          metrics:
+            avg_teamfight_participation:
+              type: average
+              label: "平均团战参与率"
+            max_teamfight_participation:
+              type: max
+              label: "最高团战参与率"
+      - name: repicked
+        description: Whether the hero was repicked (1 = yes, 0 = no)
+        meta:
+          dimension:
+            type: number
+            label: "是否重新选择"
+      - name: randomed
+        description: Whether the hero was randomed (1 = yes, 0 = no)
+        meta:
+          dimension:
+            type: number
+            label: "是否随机选择"
+      - name: pred_vict
+        description: Whether the player predicted victory (1 = yes, 0 = no)
+        meta:
+          dimension:
+            type: number
+            label: "是否预测胜利"
+

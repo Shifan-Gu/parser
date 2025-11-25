@@ -1533,8 +1533,6 @@ public class Parse {
                 
                 List<Map<String, Object>> playerEntries = new ArrayList<>();
                 List<GameInfoDAO.PlayerInfo> playersList = new ArrayList<>();
-                int[] radiantPlayerCount = {0};
-                int[] direPlayerCount = {0};
                 for (Demo.CGameInfo.CDotaGameInfo.CPlayerInfo playerInfo : dotaInfo.getPlayerInfoList()) {
                     Map<String, Object> playerData = new LinkedHashMap<>();
                     GameInfoDAO.PlayerInfo normalizedPlayer = new GameInfoDAO.PlayerInfo();
@@ -1542,6 +1540,11 @@ public class Parse {
                     if (playerInfo.hasSteamid()) {
                         playerData.put("steam_id", playerInfo.getSteamid());
                         normalizedPlayer.steamId = playerInfo.getSteamid();
+                        // Use steamId to get the correct player_slot from the mapping created during initialization
+                        Integer mappedPlayerSlot = steamIdToPlayerSlot.get(playerInfo.getSteamid());
+                        if (mappedPlayerSlot != null) {
+                            normalizedPlayer.playerSlot = mappedPlayerSlot;
+                        }
                     }
                     if (playerInfo.hasPlayerName()) {
                         playerData.put("player_name", playerInfo.getPlayerName());
@@ -1555,13 +1558,27 @@ public class Parse {
                         playerData.put("game_team", playerInfo.getGameTeam());
                         normalizedPlayer.gameTeam = playerInfo.getGameTeam();
                         
-                        // Calculate player_slot based on team and position within team
-                        if (normalizedPlayer.gameTeam == RADIANT_TEAM_ID) {
-                            normalizedPlayer.playerSlot = radiantPlayerCount[0];
-                            radiantPlayerCount[0]++;
-                        } else if (normalizedPlayer.gameTeam == DIRE_TEAM_ID) {
-                            normalizedPlayer.playerSlot = PLAYER_SLOT_OFFSET + direPlayerCount[0];
-                            direPlayerCount[0]++;
+                        // If player_slot wasn't set from steamId mapping, calculate based on team
+                        // This is a fallback - ideally steamId matching should work
+                        if (normalizedPlayer.playerSlot == null) {
+                            // Use a simple counter-based approach as fallback
+                            // Note: This may not match slot order perfectly, but it's better than null
+                            int[] radiantCount = {0};
+                            int[] direCount = {0};
+                            for (GameInfoDAO.PlayerInfo p : playersList) {
+                                if (p.gameTeam != null) {
+                                    if (p.gameTeam == RADIANT_TEAM_ID) {
+                                        radiantCount[0]++;
+                                    } else if (p.gameTeam == DIRE_TEAM_ID) {
+                                        direCount[0]++;
+                                    }
+                                }
+                            }
+                            if (normalizedPlayer.gameTeam == RADIANT_TEAM_ID) {
+                                normalizedPlayer.playerSlot = radiantCount[0];
+                            } else if (normalizedPlayer.gameTeam == DIRE_TEAM_ID) {
+                                normalizedPlayer.playerSlot = PLAYER_SLOT_OFFSET + direCount[0];
+                            }
                         }
                     }
                     if (playerInfo.hasIsFakeClient()) {

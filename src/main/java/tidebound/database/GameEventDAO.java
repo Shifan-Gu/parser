@@ -411,7 +411,8 @@ public class GameEventDAO {
         intervalStmt.setInt(2, time);
         intervalStmt.setObject(3, entry.slot);
         intervalStmt.setString(4, entry.unit);
-        intervalStmt.setObject(5, entry.hero_id);
+        // hero_id in interval_events needs to be divided by 2 to get the correct hero_id
+        intervalStmt.setObject(5, entry.hero_id != null ? entry.hero_id / 2 : null);
         intervalStmt.setObject(6, entry.variant);
         intervalStmt.setObject(7, entry.facet_hero_id);
         intervalStmt.setObject(8, entry.level);
